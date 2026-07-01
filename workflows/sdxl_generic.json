@@ -1,0 +1,67 @@
+{
+    "3": {
+        "class_type": "KSampler",
+        "inputs": {
+            "cfg": "%scale%",
+            "denoise": 1,
+            "latent_image": ["5", 0],
+            "model": ["4", 0],
+            "negative": ["7", 0],
+            "positive": ["6", 0],
+            "sampler_name": "%sampler%",
+            "scheduler": "%scheduler%",
+            "seed": "%seed%",
+            "steps": "%steps%"
+        }
+    },
+    "4": {
+        "class_type": "CheckpointLoaderSimple",
+        "inputs": {
+            "ckpt_name": "%model%"
+        }
+    },
+    "5": {
+        "class_type": "EmptyLatentImage",
+        "inputs": {
+            "batch_size": 1,
+            "height": 1152,
+            "width": 896
+        }
+    },
+    "6": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+            "clip": ["4", 1],
+            "text": "%prompt%"
+        },
+        "_meta": {"title": "正向提示词"}
+    },
+    "7": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+            "clip": ["4", 1],
+            "text": "%negative_prompt%"
+        },
+        "_meta": {"title": "反向提示词"}
+    },
+    "8": {
+        "class_type": "VAEDecode",
+        "inputs": {
+            "samples": ["3", 0],
+            "vae": ["4", 2]
+        }
+    },
+    "9": {
+        "class_type": "PreviewImage",
+        "inputs": {
+            "images": ["8", 0]
+        }
+    },
+    "10": {
+        "class_type": "SaveImage",
+        "inputs": {
+            "filename_prefix": "SillyTavern",
+            "images": ["8", 0]
+        }
+    }
+}

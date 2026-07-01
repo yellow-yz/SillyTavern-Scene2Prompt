@@ -1,0 +1,270 @@
+<!--
+    Scene2Prompt v2.0 — Settings Panel
+    Loaded via renderExtensionTemplateAsync('third-party/scene2prompt', 'settings')
+-->
+<div class="inline-drawer">
+    <div class="inline-drawer-toggle inline-drawer-header">
+        <b>Scene2Prompt · 画面增强</b>
+        <span class="inline-drawer-icon fa-solid fa-circle-chevron-down"></span>
+    </div>
+    <div class="inline-drawer-content" style="padding:10px">
+
+        <!-- Enable + Status -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <label class="checkbox_label">
+                <input type="checkbox" id="s2p_on">
+                <span><b>启用</b></span>
+            </label>
+            <span id="s2p_panel_status" class="s2p-status"></span>
+        </div>
+        <div class="s2p-hint" style="margin-bottom:10px">聊天场景 → LLM → Danbooru标签 → ComfyUI 生图</div>
+
+        <!-- ────────── Tab Bar ────────── -->
+        <div class="s2p-tab-bar">
+            <button class="s2p-tab-btn active" data-tab="basic">基本设置</button>
+            <button class="s2p-tab-btn" data-tab="image">画面设置</button>
+            <button class="s2p-tab-btn" data-tab="presets">预设 · 日志</button>
+        </div>
+
+        <!-- ═══════════════════════════════════════ -->
+        <!-- Tab 1: 基本设置 -->
+        <!-- ═══════════════════════════════════════ -->
+        <div id="s2p_tab_basic" class="s2p-tab-content active">
+
+            <!-- Primary Provider -->
+            <div class="s2p-section-title">主 LLM Provider</div>
+            <div class="s2p-row">
+                <span class="s2p-label">Provider</span>
+                <select id="s2p_provider" class="s2p-select">
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="openrouter">OpenRouter (含 Claude)</option>
+                    <option value="ollama">Ollama (本地)</option>
+                    <option value="custom">自定义 (OpenAI 兼容)</option>
+                </select>
+            </div>
+
+            <!-- DeepSeek Fields -->
+            <div id="s2p_provider_fields_deepseek" class="s2p-provider-fields">
+                <div>API Key</div>
+                <input id="s2p_deepseek_apiKey" class="s2p-input" type="password" placeholder="sk-...">
+                <div class="s2p-row">
+                    <span class="s2p-label">Model</span>
+                    <input id="s2p_deepseek_model" class="s2p-input s2p-input-sm" value="deepseek-chat" style="width:160px">
+                    <span class="s2p-label">Temp</span>
+                    <input id="s2p_deepseek_temperature" class="s2p-input s2p-input-sm" type="number" min="0" max="2" step="0.1" value="0.7" style="width:50px">
+                    <span class="s2p-label">Max Tokens</span>
+                    <input id="s2p_deepseek_maxTokens" class="s2p-input s2p-input-sm" type="number" min="64" max="8192" value="2048" style="width:70px">
+                </div>
+            </div>
+
+            <!-- OpenAI Fields -->
+            <div id="s2p_provider_fields_openai" class="s2p-provider-fields">
+                <div>API Key</div>
+                <input id="s2p_openai_apiKey" class="s2p-input" type="password" placeholder="sk-...">
+                <div class="s2p-row">
+                    <span class="s2p-label">Model</span>
+                    <input id="s2p_openai_model" class="s2p-input s2p-input-sm" value="gpt-4o-mini" style="width:160px">
+                    <span class="s2p-label">Temp</span>
+                    <input id="s2p_openai_temperature" class="s2p-input s2p-input-sm" type="number" min="0" max="2" step="0.1" value="0.7" style="width:50px">
+                    <span class="s2p-label">Max Tokens</span>
+                    <input id="s2p_openai_maxTokens" class="s2p-input s2p-input-sm" type="number" min="64" max="8192" value="2048" style="width:70px">
+                </div>
+            </div>
+
+            <!-- OpenRouter Fields -->
+            <div id="s2p_provider_fields_openrouter" class="s2p-provider-fields">
+                <div>API Key</div>
+                <input id="s2p_openrouter_apiKey" class="s2p-input" type="password" placeholder="sk-or-...">
+                <div class="s2p-row">
+                    <span class="s2p-label">Model</span>
+                    <input id="s2p_openrouter_model" class="s2p-input s2p-input-sm" value="anthropic/claude-sonnet-4-20250514" style="width:280px">
+                </div>
+                <div class="s2p-hint">推荐: anthropic/claude-sonnet-4 / openai/gpt-4o-mini / google/gemini-2.5-flash</div>
+                <div class="s2p-row">
+                    <span class="s2p-label">Temp</span>
+                    <input id="s2p_openrouter_temperature" class="s2p-input s2p-input-sm" type="number" min="0" max="2" step="0.1" value="0.7" style="width:50px">
+                    <span class="s2p-label">Max Tokens</span>
+                    <input id="s2p_openrouter_maxTokens" class="s2p-input s2p-input-sm" type="number" min="64" max="8192" value="2048" style="width:70px">
+                </div>
+            </div>
+
+            <!-- Ollama Fields -->
+            <div id="s2p_provider_fields_ollama" class="s2p-provider-fields">
+                <div>Base URL</div>
+                <input id="s2p_ollama_baseUrl" class="s2p-input" value="http://127.0.0.1:11434">
+                <div class="s2p-row">
+                    <span class="s2p-label">Model</span>
+                    <input id="s2p_ollama_model" class="s2p-input s2p-input-sm" value="qwen2.5:7b" style="width:160px">
+                </div>
+                <div class="s2p-hint">需先 <code>ollama serve</code> 启动本地服务（加 <code>OLLAMA_ORIGINS=*</code> 解决 CORS）</div>
+            </div>
+
+            <!-- Custom Fields -->
+            <div id="s2p_provider_fields_custom" class="s2p-provider-fields">
+                <div>API URL</div>
+                <input id="s2p_custom_url" class="s2p-input" placeholder="https://your-api.com/v1/chat/completions">
+                <div style="margin-top:4px">API Key <span class="s2p-hint">(可选)</span></div>
+                <input id="s2p_custom_apiKey" class="s2p-input" type="password">
+                <div class="s2p-row">
+                    <span class="s2p-label">Model</span>
+                    <input id="s2p_custom_model" class="s2p-input s2p-input-sm" style="width:160px">
+                    <span class="s2p-label">Temp</span>
+                    <input id="s2p_custom_temperature" class="s2p-input s2p-input-sm" type="number" min="0" max="2" step="0.1" value="0.7" style="width:50px">
+                    <span class="s2p-label">Max Tokens</span>
+                    <input id="s2p_custom_maxTokens" class="s2p-input s2p-input-sm" type="number" min="64" max="8192" value="2048" style="width:70px">
+                </div>
+            </div>
+
+            <!-- Test Connection -->
+            <div style="margin-top:8px">
+                <button id="s2p_test_connection" class="s2p-btn s2p-btn-primary">测试连接</button>
+                <span id="s2p_connection_status" class="s2p-status"></span>
+            </div>
+
+            <!-- Secondary Provider -->
+            <div class="s2p-section-title">备用 LLM (降级链)</div>
+            <div class="s2p-row">
+                <span class="s2p-label">备用 Provider</span>
+                <select id="s2p_secondary_provider" class="s2p-select">
+                    <option value="">不使用备用</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="ollama">Ollama</option>
+                    <option value="custom">自定义</option>
+                </select>
+            </div>
+            <div class="s2p-fallback-chain" id="s2p_fallback_chain">DeepSeek → 关键词回退</div>
+
+            <!-- Secondary Provider Fields (same structure, id suffix handled by JS) -->
+            <div id="s2p_provider_fields_" class="s2p-provider-fields" style="display:none"></div>
+
+        </div><!-- /Tab 1 -->
+
+        <!-- ═══════════════════════════════════════ -->
+        <!-- Tab 2: 画面设置 -->
+        <!-- ═══════════════════════════════════════ -->
+        <div id="s2p_tab_image" class="s2p-tab-content">
+
+            <!-- Preset -->
+            <div class="s2p-section-title">预设</div>
+            <div class="s2p-row">
+                <select id="s2p_preset_select" class="s2p-select" style="min-width:200px"></select>
+            </div>
+            <div id="s2p_preset_details" class="s2p-hint" style="margin-bottom:8px"></div>
+
+            <hr class="s2p-hr">
+
+            <!-- Generation Params -->
+            <div class="s2p-row">
+                <span class="s2p-label">风格</span>
+                <select id="s2p_style" class="s2p-select">
+                    <option value="WAI">WAI (韩漫半写实)</option>
+                    <option value="Animagine">Animagine (动漫)</option>
+                    <option value="写实">写实摄影</option>
+                </select>
+            </div>
+
+            <div class="s2p-row">
+                <span class="s2p-label">内容级别</span>
+                <select id="s2p_intensity" class="s2p-select">
+                    <option value="自动">自动 — 根据聊天内容判断</option>
+                    <option value="显式">显式 — 全放行</option>
+                    <option value="软色情">软色情 — 可裸露无性行为</option>
+                    <option value="无">无 — 完全 SFW</option>
+                </select>
+            </div>
+
+            <div class="s2p-row">
+                <span class="s2p-label">上下文消息数</span>
+                <input id="s2p_ctx" class="s2p-input s2p-input-sm" type="number" min="2" max="30" value="12" style="width:50px">
+                <span class="s2p-label">条 (2-30)</span>
+            </div>
+
+            <div class="s2p-row" style="margin-top:4px">
+                <label class="checkbox_label" style="font-size:11px">
+                    <input type="checkbox" id="s2p_pov">
+                    <span>POV 手动强制开启</span>
+                </label>
+                <span class="s2p-hint">（默认由 AI 自行判断）</span>
+            </div>
+
+            <div class="s2p-row">
+                <label class="checkbox_label" style="font-size:11px">
+                    <input type="checkbox" id="s2p_pre" checked>
+                    <span>过滤对话/心理描写/比喻</span>
+                </label>
+            </div>
+
+            <hr class="s2p-hr">
+
+            <!-- Appearance -->
+            <div class="s2p-section-title">角色外貌管理</div>
+            <div>
+                <span class="s2p-label">当前角色外貌标签</span>
+                <button id="s2p_extract" class="s2p-btn s2p-btn-sm" style="margin-left:6px">重新提取</button>
+                <span class="s2p-hint" style="margin-left:4px">（切角色时自动提取）</span>
+            </div>
+            <textarea id="s2p_cache" class="s2p-textarea" rows="2" placeholder="自动从角色卡提取，也可手动粘贴 Danbooru 标签..."></textarea>
+
+            <div style="margin-top:6px">
+                <span class="s2p-label">你的外貌（POV NSFW 场景时注入）</span>
+                <span class="s2p-hint">例: fair skin, lean build, male hands</span>
+            </div>
+            <textarea id="s2p_user_appearance" class="s2p-textarea" rows="1" placeholder="fair skin, lean build, ..."></textarea>
+
+        </div><!-- /Tab 2 -->
+
+        <!-- ═══════════════════════════════════════ -->
+        <!-- Tab 3: 预设管理 + 日志 -->
+        <!-- ═══════════════════════════════════════ -->
+        <div id="s2p_tab_presets" class="s2p-tab-content">
+
+            <!-- Preset Management -->
+            <div class="s2p-section-title">预设管理</div>
+            <div class="s2p-row" style="margin-bottom:6px">
+                <button id="s2p_preset_save" class="s2p-btn" title="保存当前设置为新预设">保存当前</button>
+                <button id="s2p_preset_delete" class="s2p-btn s2p-btn-danger" title="删除选中的自定义预设">删除预设</button>
+                <button id="s2p_preset_export" class="s2p-btn" title="导出选中预设为 JSON 文件">导出</button>
+                <button id="s2p_preset_import" class="s2p-btn" title="从 JSON 文件导入预设">导入</button>
+                <button id="s2p_preset_restore" class="s2p-btn s2p-btn-sm" title="恢复所有内置预设（不删自定义）">恢复内置</button>
+            </div>
+
+            <hr class="s2p-hr">
+
+            <!-- Prompt Preview -->
+            <div class="s2p-section-title">上次生成的提示词</div>
+            <div>
+                <span class="s2p-label" style="color:#88cc88">正向提示词</span>
+            </div>
+            <textarea id="s2p_preview" class="s2p-textarea" rows="4" readonly placeholder="正向提示词..."></textarea>
+            <div style="margin-top:4px">
+                <span class="s2p-label" style="color:#cc8888">反向提示词</span>
+            </div>
+            <textarea id="s2p_neg_preview" class="s2p-textarea" rows="2" readonly placeholder="反向提示词..."></textarea>
+
+            <hr class="s2p-hr">
+
+            <!-- Log -->
+            <div class="s2p-section-title">日志</div>
+            <div class="s2p-row">
+                <span class="s2p-label">日志级别</span>
+                <select id="s2p_log_level" class="s2p-select">
+                    <option value="debug">Debug — 所有输出</option>
+                    <option value="info" selected>Info — 关键步骤</option>
+                    <option value="error">Error — 仅错误</option>
+                    <option value="silent">Silent — 不输出</option>
+                </select>
+                <button id="s2p_clear_log" class="s2p-btn s2p-btn-sm">清空</button>
+            </div>
+            <textarea id="s2p_log" class="s2p-log" rows="6" readonly></textarea>
+
+        </div><!-- /Tab 3 -->
+
+        <!-- Footer -->
+        <div style="margin-top:8px;font-size:9px;color:#555">
+            Scene2Prompt v2.0 社区版 · ComfyUI 对接 · 多 LLM 支持
+        </div>
+    </div>
+</div>

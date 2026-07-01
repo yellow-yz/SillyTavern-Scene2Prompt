@@ -1,0 +1,234 @@
+/* ============================================================
+   Scene2Prompt v2.0 Community Edition — Settings Panel Styles
+   Dark theme, compatible with SillyTavern's inline-drawer pattern
+   ============================================================ */
+
+/* ── Tab Bar ── */
+.s2p-tab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--smart-border-color, #333);
+    margin-bottom: 10px;
+}
+.s2p-tab-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background: transparent;
+    color: #888;
+    transition: color 0.2s, background 0.2s;
+}
+.s2p-tab-btn:hover {
+    color: #ccc;
+    background: rgba(255,255,255,0.03);
+}
+.s2p-tab-btn.active {
+    color: #ddaa66;
+    border-color: var(--smart-border-color, #333);
+    background: rgba(221,170,102,0.06);
+    font-weight: bold;
+}
+
+/* ── Tab Content ── */
+.s2p-tab-content {
+    display: none;
+}
+.s2p-tab-content.active {
+    display: block;
+}
+
+/* ── Section Headers ── */
+.s2p-section-title {
+    font-size: 12px;
+    color: #aaa;
+    margin: 10px 0 4px 0;
+    padding-bottom: 2px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ── Provider Config Fields ── */
+.s2p-provider-fields {
+    display: none;
+    margin-top: 4px;
+    padding: 6px 8px;
+    border-left: 2px solid #ddaa66;
+    background: rgba(221,170,102,0.04);
+    border-radius: 0 4px 4px 0;
+}
+.s2p-provider-fields.active {
+    display: block;
+}
+
+/* ── Form Elements ── */
+.s2p-input {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 12px;
+    padding: 4px 8px;
+    margin-top: 2px;
+    border-radius: 4px;
+    border: 1px solid var(--smart-border-color, #444);
+    background: var(--smart-input-bg, #1a1a2e);
+    color: var(--smart-text-color, #ccc);
+    font-family: inherit;
+}
+.s2p-input:focus {
+    outline: none;
+    border-color: #ddaa66;
+}
+.s2p-input-sm {
+    width: auto;
+    font-size: 11px;
+    padding: 3px 6px;
+}
+.s2p-select {
+    font-size: 12px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--smart-border-color, #444);
+    background: var(--smart-input-bg, #1a1a2e);
+    color: var(--smart-text-color, #ccc);
+    cursor: pointer;
+}
+.s2p-select:focus {
+    outline: none;
+    border-color: #ddaa66;
+}
+.s2p-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 10px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    padding: 6px 8px;
+    margin-top: 2px;
+    border-radius: 4px;
+    border: 1px solid var(--smart-border-color, #444);
+    background: #1a1a2e;
+    color: #eee;
+    resize: vertical;
+}
+.s2p-textarea:focus {
+    outline: none;
+    border-color: #ddaa66;
+}
+
+/* ── Buttons ── */
+.s2p-btn {
+    font-size: 11px;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background: #2a2a3e;
+    color: #ccc;
+    transition: background 0.2s, border-color 0.2s;
+}
+.s2p-btn:hover {
+    background: #3a3a4e;
+    border-color: #ddaa66;
+    color: #ddaa66;
+}
+.s2p-btn-primary {
+    border-color: #ddaa66;
+    background: #2a1a0a;
+    color: #ddaa66;
+}
+.s2p-btn-primary:hover {
+    background: #3a2a1a;
+}
+.s2p-btn-danger {
+    border-color: #aa4444;
+    color: #cc6666;
+}
+.s2p-btn-danger:hover {
+    background: #3a1a1a;
+    border-color: #cc6666;
+}
+.s2p-btn-sm {
+    font-size: 10px;
+    padding: 2px 6px;
+}
+
+/* ── Status ── */
+.s2p-status {
+    font-size: 11px;
+    color: #ddaa66;
+    white-space: nowrap;
+    margin-left: 6px;
+}
+.s2p-status-ok { color: #66aa66; }
+.s2p-status-err { color: #cc6666; }
+
+/* ── Log ── */
+.s2p-log {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 10px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    background: #1a1a2e;
+    color: #eee;
+    border: 1px solid var(--smart-border-color, #333);
+    border-radius: 4px;
+    resize: vertical;
+}
+.s2p-log:focus {
+    outline: none;
+    border-color: #ddaa66;
+}
+
+/* ── Preset List ── */
+.s2p-preset-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    margin: 2px 0;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.03);
+    font-size: 12px;
+}
+.s2p-preset-item:hover {
+    background: rgba(255,255,255,0.06);
+}
+.s2p-preset-item span {
+    flex: 1;
+}
+.s2p-preset-item .builtin-badge {
+    font-size: 9px;
+    color: #888;
+    margin-left: 6px;
+}
+
+/* ── Inline Row ── */
+.s2p-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 4px 0;
+}
+.s2p-label {
+    font-size: 11px;
+    color: #aaa;
+}
+
+/* ── Divider ── */
+.s2p-hr {
+    margin: 8px 0;
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+/* ── Misc ── */
+.s2p-hint {
+    font-size: 10px;
+    color: #666;
+}
+.s2p-fallback-chain {
+    font-size: 10px;
+    color: #888;
+    font-style: italic;
+}
