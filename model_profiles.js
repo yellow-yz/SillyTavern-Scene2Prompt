@@ -21,7 +21,7 @@ const BUILT_IN_PROFILES = [
         builtIn: true,
         promptFormat: 'danbooru',
         qualityPrefix: '(masterpiece:1.3), (best quality:1.3), (amazing quality:1.2), (very aesthetic:1.2), absurdres, (detailed:1.2), (highres:1.2), (natural skin:1.2), (skin texture:1.1)',
-        negativePrefix: 'lowres, (bad quality:1.2), (worst quality:1.2), bad anatomy, sketch, jpeg artifacts, ugly, poorly drawn, (censored:1.8), (mosaic:1.8), blurry, watermark, extra digits, anime style, anime coloring, cel shading, 3d render, photorealistic, raw photo, cartoon, plastic skin, airbrushed, doll-like, signature, text',
+        negativePrefix: 'lowres, (bad quality:1.2), (worst quality:1.2), bad anatomy, sketch, jpeg artifacts, ugly, poorly drawn, blurry, watermark, extra digits, anime style, anime coloring, cel shading, 3d render, photorealistic, raw photo, cartoon, plastic skin, airbrushed, doll-like, signature, text',
         styleNotes: '2.5D 半写实韩漫风格。禁止: anime style, anime coloring, cel shading, cartoon, photorealistic, raw photo, 3d render',
         recommendedSteps: 30, recommendedCfg: 5, recommendedSampler: 'euler_ancestral', recommendedScheduler: 'normal',
         recommendedSize: { width: 896, height: 1152 }, clipSkip: 2,
@@ -170,16 +170,58 @@ function buildDanbooruPrompt(profile) {
 6行Danbooru标签
 
 第1行 — 品质+风格(<=8): ${qualityLine}
-第2行 — 主体(<=4): 正确人数标签（1girl+female / 2girls / solo focus+POV）
-第3行 — 姿势+表情(<=25): 多人时每人写不同姿势天然分离
-第4行 — 服装(<=10): 以聊天记录为准
-第5行 — 身体+发型(<=30): 多人按角色分写。禁止性器官/液体
-第6行 — 场景+光线+视角+构图(<=8)
+
+第2行 — 主体(<=4): 标准人数标签
+  单人: 1girl+female 或 solo focus+POV+first person view
+  双人: couple, (duo focus:1.3), 2girls / 1boy1girl / couple hetero / couple yuri
+  三人: 3girls / 1boy2girls 等
+  四人+: multiple girls, group, crowd
+  ★ 多人场景必须加 (duo focus:1.3) 避免模型只画单人
+  POV判断: 「你」只是观看者→POV；「你」也在画面中→客观视角。多人POV仍可用POV标签但不加solo focus
+
+★ 角色系列标签（帮生图模型精准识别角色）:
+  如果角色来自知名动漫/游戏作品，在第2行追加系列标签:
+    格式: 1girl, [角色英文Danbooru名], [系列名], [其他标签]...
+    示例: 1girl, hatsune miku, vocaloid, ...  或  1girl, miyamizu mitsuha, kimi no na wa, ...
+    常见系列: genshin impact, hololive, blue archive, fate/grand order, kimi no na wa, one piece, naruto, vocaloid, ...
+  如果角色非知名作品角色或原创，只写角色名称，不要编造系列标签。
+
+第3行 — 姿势+表情(<=25): ★ 多人场景核心规则 ★
+  【2人及以上】按角色分别写，格式: name1: pose, expression; name2: pose, expression
+  必须写出空间关系，根据场景类型选择:
+    对话: facing each other, eye contact, (one sitting:1.2), (one standing:1.2)
+    并肩: side by side, walking together, same direction, (arm in arm:1.2)
+    对立: back to back, facing away, turning away, (arms crossed:1.1)
+    教学: (one pointing:1.2), (one explaining:1.2), (one listening:1.3)
+    照顾: (leaning over:1.2), (looking up:1.2), protective stance
+    擦肩: passing by, glancing back, wind blowing
+    围观: (in background:1.3), out of focus, crowd
+    上下: (looking up at:1.2), (looking down at:1.2), height difference
+  表情也要分离: 一人开心另一人害羞 / 一人严肃另一人轻松
+  【单人】: 直接写姿势+表情，不必按角色分
+
+第4行 — 服装(<=10): 多人按角色分写: name1: clothing1; name2: clothing2。同场景同制服写一次即可
+
+第5行 — 身体+发型(<=30): 多人按角色分写: name1: hair/eyes/build; name2: hair/eyes/build。禁止混淆特征
+  （性器官/体液标签规则见底部「内容级别」说明）
+
+第6行 — 场景+光线+视角+构图(<=8): 根据人数和场景选镜头:
+  单人: 自由构图
+  2人互动: medium shot / from side / cowboy shot（对话不用 close-up，看不清两人关系）
+  3人: wide shot / from front
+  4人+: wide shot / group shot / from above
+  战斗: dynamic angle / from side / action shot
+  亲密: POV / close-up / from above
+  日常: from front / wide shot
+
 ${notes}${extraRules}
 ## 规则
 - 画面唯一依据=聊天记录。比喻/拟人忽略，只提取字面物理动作
 - 单画面一个核心动作，禁止矛盾组合。不编造特征
-- SFW 场景即使角色有性器官描写也绝对不加 NSFW 标签
+- ★★★ 人数铁律: 如果用户消息中标注了「当前场景共有 N 个角色」，第2行必须用对应的人数标签。N≥2 时禁止使用 1girl/solo focus（即使用POV也不能用solo focus）；必须使用 Ngirls 或 1boy(N-1)girls 等正确标签
+- 多人场景: 以聊天记录中明确在场的角色为准，不编造不在场角色
+- ★ 多人防混合: 负向词中必须含 duplicate, bilateral symmetry, (blending:1.3) 防止角色特征互相污染
+- 性内容标签的位置由底部「内容级别」说明决定，严格遵守
 
 ## 反向提示词
 ${profile.negativePrefix}
@@ -196,12 +238,24 @@ function buildNaturalPrompt(profile) {
 用一句中文简述当前场景
 
 [POSITIVE]
-一段 100-250 字英文画面描述，自然段落格式：构图和视角、人物外貌姿势表情、服装细节（以聊天记录为准）、场景环境物品、光照氛围
+一段 100-250 字英文画面描述，自然段落格式：
+  构图和视角、人物外貌姿势表情、服装细节（以聊天记录为准）、场景环境物品、光照氛围
+
+★ 多人场景（2人及以上）:
+  用空间位置描述每个角色，句式: "On the left, [name1] is [action] with [expression]. On the right, [name2] [action] with [expression]. They are [facing each other / standing side by side / one behind the other]."
+  根据场景选构图: 对话→medium shot from side，餐桌→wide shot from above，并肩→wide shot from front，战斗→dynamic angle，亲密→close-up
+
+★ 角色系列标签:
+  如果角色是知名动漫/游戏角色，在描述开头写 "An illustration of [character] from [series], ..."
+  原创角色不需要加系列标签
+
 品质词前缀: ${profile.qualityPrefix}
 ${notes}
 ## 规则
 - 画面唯一依据=聊天记录。比喻/拟人忽略
 - 不编造特征。描述具体可视化
+- 多人场景: 以聊天记录中明确在场的角色为准
+- 知名角色加系列标签，原创角色不加
 
 ## 反向提示词
 ${profile.negativePrefix}
@@ -234,10 +288,49 @@ ${profile.negativePrefix}
 
 function buildContentBlock(intensity) {
     switch (intensity) {
-        case '无':   return '## 内容级别: SFW\n全年龄向。禁止任何性相关标签。人物保持着装完整。';
-        case '软色情': return '## 内容级别: 软色情\n允许裸露（nude, naked, bare shoulders 等）和内衣，但禁止性行为标签。';
-        case '显式':  return '## 内容级别: 显式\n允许全部标签。体位=missionary/doggystyle/cowgirl/fellatio/blowjob/cunnilingus/spoon/masturbation/creampie(权重1.3)。器官=pussy/labia/clitoris/nipples/penis/glans(权重1.3)。体液=pussy juice/semen/cum/saliva(权重1.2)。一个场景一个体位。POV由你判断。';
-        default:     return '## 内容级别: 自动判断\n自行判断。SFW 场景绝对不加 NSFW 标签。';
+        case '无':
+            return `## 内容级别: SFW
+当前为全年龄场景。所有6行均禁止任何性相关标签。
+- 第3行: 禁止性行为标签
+- 第5行: 禁止性器官/体液标签，身体描述限于脸/发型/体型
+- 第6行: 禁止性暗示场景描述
+人物必须保持着装完整。`;
+
+        case '软色情':
+            return `## 内容级别: 软色情
+允许裸露和性感氛围，但无明确性行为。
+- 第3行: 允许 suggestive pose, 但禁止性行为标签 (禁止: missionary/doggystyle/cowgirl/fellatio/blowjob/cunnilingus/creampie 等)
+- 第4行: 允许 lingerie, underwear, partially clothed, completely nude 等
+- 第5行: 允许体型描述(large breasts, curvy, slim waist 等)，允许裸露状态(nude, bare)，禁止性器官标签(pussy/labia/penis/glans/nipples 等)
+- 第6行: 允许 dim lighting, bedroom, on bed`;
+
+        case '显式':
+            return `## ★★★ 内容级别: 显式 — 必须包含性器官标签 ★★★
+
+⚠️ 这是硬性要求，不是建议。性器官标签是画面核心，缺少会导致生成结果完全不正确。
+
+第3行(姿势+表情) — 必须包含性行为标签:
+  权重1.3。从聊天记录中提取当前发生的性行为，选择对应标签（必须至少一个）:
+    missionary(传教士) / doggystyle(后入) / cowgirl(骑乘) / fellatio+blowjob(口交) / cunnilingus(舔阴) / spoon(侧入) / masturbation+fingering(自慰) / creampie(中出)
+  配合表情: ahegao, orgasm, embarrassed, tears, closed eyes, open mouth, tongue out
+
+第5行(身体) — ★★★ 必须包含性器官标签 ★★★:
+  根据画面中可见的身体部位，必须至少包含以下标签之一（权重1.3）:
+    女性器官: pussy, labia, clitoris, (spread pussy:1.3), (wet pussy:1.2)
+    男性器官: penis, glans, (erect penis:1.3)
+    共通器官: nipples, (erect nipples:1.2)
+  体液标签（权重1.2）: pussy juice, semen, cum, saliva, sweat, grool — 根据场景添加
+  状态标签: erect, wet, parted, spread, penetration, inside
+  多人时必须按角色分别列出各自可见的性器官: name1: pussy/labia; name2: penis/glans
+
+第6行(场景):
+  必须包含 POV / first person view / close-up / from above / on bed / mirror 中的适当标签。POV由你判断。`;
+
+        default: // 自动
+            return `## 内容级别: 自动判断
+根据聊天内容自行判断当前是否为 NSFW 场景：
+- 如果是 SFW 日常场景(吃饭/写作业/运动/逛街等)：所有行的性标签禁止，即使角色设定中有性器官描写也不使用。
+- 如果涉及性内容：按显式规则处理（第3行可含性行为，第5行可含性器官/体液）。`;
     }
 }
 
@@ -251,7 +344,7 @@ class ModelProfileManager {
     _settings() {
         if (!extension_settings[this.moduleName]) extension_settings[this.moduleName] = {};
         const s = extension_settings[this.moduleName];
-        if (!s.modelProfiles) s.modelProfiles = { custom: [], activeProfileId: BUILT_IN_PROFILES[0].id };
+        if (!s.modelProfiles) s.modelProfiles = { custom: [], activeProfileId: 'noobai_xl_v10' };
         return s;
     }
 

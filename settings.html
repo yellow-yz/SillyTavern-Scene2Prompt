@@ -97,6 +97,12 @@
                     <span class="s2p-label">Model</span>
                     <input id="s2p_ollama_model" class="s2p-input s2p-input-sm" value="qwen2.5:7b" style="width:160px">
                 </div>
+                <div class="s2p-row">
+                    <span class="s2p-label">Temp</span>
+                    <input id="s2p_ollama_temperature" class="s2p-input s2p-input-sm" type="number" min="0" max="2" step="0.1" value="0.7" style="width:50px">
+                    <span class="s2p-label">Max Tokens</span>
+                    <input id="s2p_ollama_maxTokens" class="s2p-input s2p-input-sm" type="number" min="64" max="8192" value="2048" style="width:70px">
+                </div>
                 <div class="s2p-hint">需先 <code>ollama serve</code> 启动本地服务（加 <code>OLLAMA_ORIGINS=*</code> 解决 CORS）</div>
             </div>
 
@@ -233,6 +239,17 @@
                 </div>
             </details>
 
+            <!-- Last Prompt Mini Preview -->
+            <details style="font-size:11px;margin-bottom:8px">
+                <summary style="cursor:pointer;color:#888">上次发给生图后端的提示词 ▼</summary>
+                <div style="margin-top:4px">
+                    <span class="s2p-label" style="color:#88cc88">正向</span>
+                    <textarea id="s2p_preview_mini" class="s2p-textarea" rows="3" readonly placeholder="尚未生成..."></textarea>
+                    <span class="s2p-label" style="color:#cc8888">反向</span>
+                    <textarea id="s2p_neg_preview_mini" class="s2p-textarea" rows="2" readonly placeholder="尚未生成..."></textarea>
+                </div>
+            </details>
+
             <!-- Appearance -->
             <div class="s2p-section-title">角色外貌管理</div>
             <div class="s2p-row" style="margin-bottom:4px">
@@ -282,6 +299,21 @@
                 <span class="s2p-label" style="color:#cc8888">反向提示词</span>
             </div>
             <textarea id="s2p_neg_preview" class="s2p-textarea" rows="2" readonly placeholder="反向提示词..."></textarea>
+
+            <hr class="s2p-hr">
+
+            <!-- Advanced -->
+            <div class="s2p-section-title">高级选项</div>
+            <div class="s2p-row">
+                <span class="s2p-label">超时(秒)</span>
+                <input id="s2p_timeout" class="s2p-input s2p-input-sm" type="number" min="10" max="300" value="60" style="width:50px">
+                <span class="s2p-label">重试次数</span>
+                <input id="s2p_max_retries" class="s2p-input s2p-input-sm" type="number" min="0" max="10" value="3" style="width:40px">
+            </div>
+            <div style="margin-top:4px">
+                <span class="s2p-label">自定义 System Prompt（覆盖模型配置）</span>
+                <textarea id="s2p_system_prompt_override" class="s2p-textarea" rows="2" placeholder="留空则使用模型配置的内置 prompt..."></textarea>
+            </div>
 
             <hr class="s2p-hr">
 

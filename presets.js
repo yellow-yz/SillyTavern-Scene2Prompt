@@ -226,6 +226,7 @@ class PresetManager {
             config: {
                 provider: s.provider,
                 secondaryProvider: s.secondaryProvider || '',
+                modelProfileId: s.modelProfiles?.activeProfileId || 'noobai_xl_v10',
                 style: s.style,
                 intensity: s.intensity,
                 contextMessages: s.contextMessages,
@@ -315,6 +316,7 @@ class PresetManager {
             config: {
                 provider: data.config.provider || 'deepseek',
                 secondaryProvider: data.config.secondaryProvider || '',
+                modelProfileId: data.config.modelProfileId || 'noobai_xl_v10',
                 style: data.config.style || 'WAI',
                 intensity: data.config.intensity || '自动',
                 contextMessages: data.config.contextMessages || 12,

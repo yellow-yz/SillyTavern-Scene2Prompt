@@ -77,8 +77,7 @@ const DEFAULT_SETTINGS = {
     providerTimeout: 60,       // seconds
     maxRetries: 3,
 
-    // Migration marker
-    _migrated: 2,
+    // Migration marker (NOT set by default — migration runs on first init)
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -323,8 +322,14 @@ function bindSettingsEvents() {
 
     // Presets
     bind('s2p_preset_select', 'change', function() {
-        if (presetManager) presetManager.apply(this.value);
+        if (!presetManager) return;
+        const preset = presetManager.get(this.value);
+        presetManager.apply(this.value);
         updatePresetUI();
+        if (preset) {
+            log('已切换预设: ' + preset.name + ' → Provider:' + (preset.config.provider||'?') + ' 风格:' + (preset.config.style||'?') + ' 内容:' + (preset.config.intensity||'?'), 'info');
+            if (typeof toastr !== 'undefined') toastr.info('预设: ' + preset.name, 'Scene2Prompt');
+        }
     });
     bind('s2p_preset_save', 'click', () => {
         if (!presetManager) return;
@@ -399,11 +404,15 @@ function bindSettingsEvents() {
         if (!s.modelProfiles) s.modelProfiles = {};
         s.modelProfiles.activeProfileId = this.value;
         // Sync style to match model profile
-        const styleMap = { wai_illustrious_v140:'WAI', animagine_xl_v31:'Animagine', noobai_xl_v10:'Animagine', pony_diffusion_v6:'Animagine', illustrious_xl_v10:'Animagine', sdxl_base_10:'写实', hassaku_xl_v10:'写实' };
+        const styleMap = { wai_illustrious_v140:'WAI', animagine_xl_v31:'Animagine', noobai_xl_v10:'Animagine', pony_diffusion_v6:'Animagine', illustrious_xl_v10:'Animagine', hassaku_xl_v10:'Animagine', sdxl_base_10:'写实' };
         if (styleMap[this.value]) s.style = styleMap[this.value];
         saveSettingsDebounced();
         updateModelProfileUI();
         updateSettingsUI();
+        if (modelProfileManager) {
+            const p = modelProfileManager.get(this.value);
+            if (p) log('已切换模型: ' + p.name + ' (' + p.baseModel + ' · ' + p.promptFormat + ') Steps:' + p.recommendedSteps + ' CFG:' + p.recommendedCfg, 'info');
+        }
     });
     bind('s2p_profile_save', 'click', () => {
         if (!modelProfileManager) return;
@@ -463,6 +472,33 @@ function bindSettingsEvents() {
             log('外貌缓存已全部清空', 'info');
         }
     });
+
+    // Cache list button delegation (avoids inline onclick JS injection risk)
+    const cacheList = document.getElementById('s2p_cache_list');
+    if (cacheList) {
+        cacheList.addEventListener('click', function(e) {
+            const row = e.target.closest('.s2p-preset-item');
+            if (!row) return;
+            const name = row.dataset.cacheName;
+            if (!name) return;
+
+            if (e.target.classList.contains('s2p-cache-del')) {
+                delete s.appearanceCache[name];
+                saveSettingsDebounced();
+                updateCacheListUI();
+                log('已删除外貌缓存: ' + name, 'info');
+            } else if (e.target.classList.contains('s2p-cache-extract')) {
+                if (!engine) return;
+                const ctx = getContext();
+                const char = Object.values(ctx.characters || {}).find(c => c.name === name);
+                if (char) {
+                    engine.extractAppearance(name, char.description);
+                    updateSettingsUI();
+                    updateCacheListUI();
+                }
+            }
+        });
+    }
 
     // Test connection
     bind('s2p_test_connection', 'click', async () => {
@@ -788,38 +824,20 @@ function updateCacheListUI() {
         if (tags && tags.length > 5) {
             cachedCount++;
             const preview = tags.length > 50 ? tags.substring(0, 50) + '...' : tags;
-            html += `<div class="s2p-preset-item">
+            html += `<div class="s2p-preset-item" data-cache-name="${escapeHtml(char.name)}">
                 <span>${escapeHtml(char.name)} — <span style="color:#88cc88;font-size:10px">${escapeHtml(preview)}</span></span>
-                <button class="s2p-btn s2p-btn-sm" onclick="window._s2pDelCache('${escapeHtml(char.name)}')">删除</button>
+                <button class="s2p-btn s2p-btn-sm s2p-cache-del">删除</button>
             </div>`;
         } else {
-            html += `<div class="s2p-preset-item">
+            html += `<div class="s2p-preset-item" data-cache-name="${escapeHtml(char.name)}">
                 <span>${escapeHtml(char.name)} — <span style="color:#666;font-size:10px">(未缓存)</span></span>
-                <button class="s2p-btn s2p-btn-sm" onclick="window._s2pExtractOne('${escapeHtml(char.name)}')">提取</button>
+                <button class="s2p-btn s2p-btn-sm s2p-cache-extract">提取</button>
             </div>`;
         }
     }
     container.innerHTML = html;
     container.dataset.count = cachedCount + '/' + allChars.length;
 }
-
-// Global helpers for cache list buttons
-window._s2pDelCache = function(name) {
-    const s = getSettings();
-    delete s.appearanceCache[name];
-    saveSettingsDebounced();
-    updateCacheListUI();
-    log('已删除外貌缓存: ' + name, 'info');
-};
-window._s2pExtractOne = async function(name) {
-    const ctx = getContext();
-    const char = Object.values(ctx.characters || {}).find(c => c.name === name);
-    if (char && engine) {
-        await engine.extractAppearance(name, char.description);
-        updateSettingsUI();
-        updateCacheListUI();
-    }
-};
 
 // ═══════════════════════════════════════════════════════════
 // Enhanced Test Connection
@@ -936,6 +954,11 @@ async function onPromptProcessing(eventData) {
         if (previewBox) { previewBox.value = result.prompt; previewBox.style.display = ''; }
         const negBox = document.getElementById('s2p_neg_preview');
         if (negBox && result.negative) { negBox.value = result.negative; negBox.style.display = ''; }
+        // Mini preview in Tab 2
+        const miniPos = document.getElementById('s2p_preview_mini');
+        if (miniPos) miniPos.value = result.prompt.substring(0, 500);
+        const miniNeg = document.getElementById('s2p_neg_preview_mini');
+        if (miniNeg && result.negative) miniNeg.value = result.negative.substring(0, 300);
 
         setGenButtonState(null);
 
