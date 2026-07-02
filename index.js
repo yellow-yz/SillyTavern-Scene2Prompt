@@ -615,12 +615,26 @@ function updateModelProfileUI() {
         sel.appendChild(opt);
     }
 
-    // Show active profile info
     const profile = modelProfileManager.get(activeId);
+    if (!profile) return;
+
+    // Info line
+    const fmt = profile.promptFormat === 'danbooru' ? 'Danbooru标签' : profile.promptFormat === 'natural' ? '自然语言' : '混合';
     const infoEl = document.getElementById('s2p_model_profile_info');
-    if (infoEl && profile) {
-        const fmt = profile.promptFormat === 'danbooru' ? 'Danbooru标签' : profile.promptFormat === 'natural' ? '自然语言' : '混合';
-        infoEl.textContent = `${profile.baseModel} · ${fmt} · ${profile.recommendedSize.width}×${profile.recommendedSize.height} · Steps:${profile.recommendedSteps} CFG:${profile.recommendedCfg} · ${profile.description}`;
+    if (infoEl) {
+        const vPredNote = profile.vPred ? ' ⚡v-pred' : '';
+        infoEl.textContent = `${profile.baseModel}${vPredNote} · ${fmt} · ${profile.recommendedSize.width}×${profile.recommendedSize.height} · Steps:${profile.recommendedSteps} CFG:${profile.recommendedCfg} · 采样器:${profile.recommendedSampler} · ${profile.description}`;
+    }
+
+    // Warning
+    const warnEl = document.getElementById('s2p_model_profile_warning');
+    if (warnEl) {
+        if (profile.warning) {
+            warnEl.textContent = '⚠️ ' + profile.warning;
+            warnEl.style.display = 'block';
+        } else {
+            warnEl.style.display = 'none';
+        }
     }
 }
 

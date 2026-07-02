@@ -147,31 +147,23 @@
         <!-- ═══════════════════════════════════════ -->
         <div id="s2p_tab_image" class="s2p-tab-content">
 
-            <!-- Preset -->
-            <div class="s2p-section-title">预设</div>
+            <!-- Model Profile (Primary) -->
+            <div class="s2p-section-title">🎨 生图模型</div>
             <div class="s2p-row">
-                <select id="s2p_preset_select" class="s2p-select" style="min-width:200px"></select>
+                <select id="s2p_model_profile" class="s2p-select" style="min-width:220px"></select>
             </div>
-            <div id="s2p_preset_details" class="s2p-hint" style="margin-bottom:8px"></div>
-
-            <hr class="s2p-hr">
-
-            <!-- Model Profile -->
-            <div class="s2p-section-title">生图模型配置</div>
-            <div class="s2p-row">
-                <select id="s2p_model_profile" class="s2p-select" style="min-width:200px"></select>
-            </div>
+            <div id="s2p_model_profile_warning" style="display:none;margin:4px 0;padding:6px 8px;background:rgba(255,170,60,0.1);border-left:3px solid #ddaa66;border-radius:0 4px 4px 0;font-size:11px;color:#ddaa66"></div>
             <div id="s2p_model_profile_info" class="s2p-hint" style="margin-bottom:4px"></div>
             <div class="s2p-row">
                 <button id="s2p_profile_export" class="s2p-btn s2p-btn-sm">导出</button>
                 <button id="s2p_profile_import" class="s2p-btn s2p-btn-sm">导入</button>
                 <button id="s2p_profile_save" class="s2p-btn s2p-btn-sm">保存副本</button>
-                <button id="s2p_profile_delete" class="s2p-btn s2p-btn-sm s2p-btn-danger" title="删除自定义模型配置">删除</button>
+                <button id="s2p_profile_delete" class="s2p-btn s2p-btn-sm s2p-btn-danger">删除</button>
             </div>
 
             <hr class="s2p-hr">
 
-            <!-- Generation Params -->
+            <!-- Content Settings -->
             <div class="s2p-row">
                 <span class="s2p-label">风格</span>
                 <select id="s2p_style" class="s2p-select">
@@ -231,6 +223,15 @@
             </div>
 
             <hr class="s2p-hr">
+
+            <!-- Preset (secondary - quick switch) -->
+            <details style="font-size:11px;margin-bottom:8px">
+                <summary style="cursor:pointer;color:#888">快速切换预设 (一键切换 LLM + 模型 + 内容)</summary>
+                <div style="margin-top:4px">
+                    <select id="s2p_preset_select" class="s2p-select" style="min-width:200px"></select>
+                    <div id="s2p_preset_details" class="s2p-hint" style="margin-top:2px"></div>
+                </div>
+            </details>
 
             <!-- Appearance -->
             <div class="s2p-section-title">角色外貌管理</div>
