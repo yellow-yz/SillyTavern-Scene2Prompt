@@ -76,9 +76,10 @@ class S2PEngine {
      * @param {Function} logFn
      * @param {Function} getSettingsFn
      */
-    constructor(providerRegistry, presetManager, logFn, getSettingsFn) {
+    constructor(providerRegistry, presetManager, modelProfileManager, logFn, getSettingsFn) {
         this.providers = providerRegistry;
         this.presets = presetManager;
+        this.modelProfiles = modelProfileManager;
         this.log = logFn || (() => {});
         this.getSettings = getSettingsFn || (() => extension_settings?.scene2prompt || {});
 
@@ -334,10 +335,15 @@ class S2PEngine {
 
     buildSystemPrompt() {
         const s = this.getSettings();
-        // Use override if set
         if (s.systemPromptOverride && s.systemPromptOverride.length > 20) {
             return s.systemPromptOverride;
         }
+        // Use model profile's prompt builder
+        if (this.modelProfiles) {
+            const profileId = s.modelProfiles?.activeProfileId || 'noobai_xl_v10';
+            return this.modelProfiles.buildSystemPrompt(profileId, s.intensity || '自动');
+        }
+        // Fallback to legacy hardcoded prompt
         return DEFAULT_SYSTEM_PROMPT;
     }
 

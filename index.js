@@ -26,6 +26,7 @@ const MODULE_NAME = 'scene2prompt';
 let engine = null;           // S2PEngine instance
 let providerRegistry = null; // ProviderRegistry instance
 let presetManager = null;    // PresetManager instance
+let modelProfileManager = null; // ModelProfileManager instance
 
 let lastPrompt = '';
 let lastNegative = '';
@@ -392,6 +393,45 @@ function bindSettingsEvents() {
         }
     });
 
+    // Model Profile
+    bind('s2p_model_profile', 'change', function() {
+        const s = getSettings();
+        if (!s.modelProfiles) s.modelProfiles = {};
+        s.modelProfiles.activeProfileId = this.value;
+        saveSettingsDebounced();
+        updateModelProfileUI();
+    });
+    bind('s2p_profile_save', 'click', () => {
+        if (!modelProfileManager) return;
+        const name = prompt('模型配置名称：');
+        if (name) { modelProfileManager.save(name); updateModelProfileUI(); log('模型配置已保存: ' + name, 'info'); }
+    });
+    bind('s2p_profile_delete', 'click', () => {
+        if (!modelProfileManager) return;
+        const id = getSettings().modelProfiles?.activeProfileId;
+        if (!id) return;
+        const p = modelProfileManager.get(id);
+        if (!p) return;
+        if (p.builtIn) { alert('内置模型配置不可删除'); return; }
+        if (confirm(`确定删除「${p.name}」？`)) { modelProfileManager.delete(id); updateModelProfileUI(); }
+    });
+    bind('s2p_profile_export', 'click', () => {
+        if (!modelProfileManager) return;
+        const id = getSettings().modelProfiles?.activeProfileId;
+        if (!id) return;
+        const json = modelProfileManager.export(id);
+        if (json) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([json], {type:'application/json'})); a.download = 's2p_profile_' + id + '.json'; a.click(); }
+    });
+    bind('s2p_profile_import', 'click', () => {
+        const input = document.createElement('input'); input.type = 'file'; input.accept = '.json';
+        input.onchange = async (e) => {
+            const f = e.target.files[0]; if (!f) return;
+            try { modelProfileManager.import(await f.text()); updateModelProfileUI(); log('模型配置已导入', 'info'); }
+            catch (err) { log('导入失败: ' + err.message, 'error'); }
+        };
+        input.click();
+    });
+
     // Advanced
     bind('s2p_log_level', 'change', function() { s.logLevel = this.value; saveSettingsDebounced(); });
     bind('s2p_timeout', 'input', function() { s.providerTimeout = parseInt(this.value) || 60; saveSettingsDebounced(); });
@@ -430,6 +470,7 @@ function bindSettingsEvents() {
         updateSettingsUI();
         updateProviderUI();
         updatePresetUI();
+        updateModelProfileUI();
     });
 
     // Initialize UI state
@@ -485,6 +526,9 @@ function updateSettingsUI() {
 
     // Cache list
     setTimeout(updateCacheListUI, 200);
+
+    // Model profile
+    setTimeout(updateModelProfileUI, 100);
 }
 
 /**
@@ -543,6 +587,36 @@ function updatePresetUI() {
     const detailsEl = document.getElementById('s2p_preset_details');
     if (detailsEl && active) {
         detailsEl.textContent = active.description || '';
+    }
+}
+
+/**
+ * Update model profile dropdown and info display.
+ */
+function updateModelProfileUI() {
+    const sel = document.getElementById('s2p_model_profile');
+    if (!sel || !modelProfileManager) return;
+
+    const s = getSettings();
+    if (!s.modelProfiles) s.modelProfiles = { activeProfileId: 'noobai_xl_v10' };
+    const profiles = modelProfileManager.getAll();
+    const activeId = s.modelProfiles.activeProfileId;
+
+    sel.innerHTML = '';
+    for (const p of profiles) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.builtIn ? `${p.name} [内置]` : p.name;
+        if (p.id === activeId) opt.selected = true;
+        sel.appendChild(opt);
+    }
+
+    // Show active profile info
+    const profile = modelProfileManager.get(activeId);
+    const infoEl = document.getElementById('s2p_model_profile_info');
+    if (infoEl && profile) {
+        const fmt = profile.promptFormat === 'danbooru' ? 'Danbooru标签' : profile.promptFormat === 'natural' ? '自然语言' : '混合';
+        infoEl.textContent = `${profile.baseModel} · ${fmt} · ${profile.recommendedSize.width}×${profile.recommendedSize.height} · Steps:${profile.recommendedSteps} CFG:${profile.recommendedCfg} · ${profile.description}`;
     }
 }
 
@@ -892,8 +966,11 @@ export async function init() {
         const presetsMod = await import('./presets.js');
         presetManager = new presetsMod.PresetManager(MODULE_NAME);
 
+        const modelProfilesMod = await import('./model_profiles.js');
+        modelProfileManager = new modelProfilesMod.ModelProfileManager(MODULE_NAME);
+
         const engineMod = await import('./engine.js');
-        engine = new engineMod.S2PEngine(providerRegistry, presetManager, log, getSettings);
+        engine = new engineMod.S2PEngine(providerRegistry, presetManager, modelProfileManager, log, getSettings);
 
         log('所有模块已加载', 'info');
     } catch (e) {
