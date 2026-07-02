@@ -398,8 +398,12 @@ function bindSettingsEvents() {
         const s = getSettings();
         if (!s.modelProfiles) s.modelProfiles = {};
         s.modelProfiles.activeProfileId = this.value;
+        // Sync style to match model profile
+        const styleMap = { wai_illustrious_v140:'WAI', animagine_xl_v31:'Animagine', noobai_xl_v10:'Animagine', pony_diffusion_v6:'Animagine', illustrious_xl_v10:'Animagine', sdxl_base_10:'写实', hassaku_xl_v10:'写实' };
+        if (styleMap[this.value]) s.style = styleMap[this.value];
         saveSettingsDebounced();
         updateModelProfileUI();
+        updateSettingsUI();
     });
     bind('s2p_profile_save', 'click', () => {
         if (!modelProfileManager) return;

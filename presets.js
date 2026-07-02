@@ -16,11 +16,12 @@ const BUILT_IN_PRESETS = [
     {
         id: 'manhwa_specialized',
         name: '韩漫特化',
-        description: '韩漫半写实风格，DeepSeek + WAI Illustrious，NSFW 成人向最佳选择。896×1152',
+        description: '韩漫半写实风格，DeepSeek + WAI Illustrious。896×1152',
         builtIn: true,
         config: {
             provider: 'deepseek',
             secondaryProvider: '',
+            modelProfileId: 'wai_illustrious_v140',
             style: 'WAI',
             intensity: '自动',
             contextMessages: 12,
@@ -32,11 +33,12 @@ const BUILT_IN_PRESETS = [
     {
         id: 'generic_anime',
         name: '通用动漫',
-        description: 'Anime 风格，Animagine XL，适合 SFW 日常场景。1024×1024',
+        description: '精细动漫风格，Animagine XL。1024×1024',
         builtIn: true,
         config: {
             provider: 'deepseek',
             secondaryProvider: '',
+            modelProfileId: 'animagine_xl_v31',
             style: 'Animagine',
             intensity: '自动',
             contextMessages: 10,
@@ -48,11 +50,12 @@ const BUILT_IN_PRESETS = [
     {
         id: 'photorealistic',
         name: '写实摄影',
-        description: '照片级写实风格，Hassaku XL / 写实模型，适合高质量写实出图。1024×1024',
+        description: '照片级写实，SDXL Base。1024×1024',
         builtIn: true,
         config: {
             provider: 'openai',
             secondaryProvider: 'deepseek',
+            modelProfileId: 'sdxl_base_10',
             style: '写实',
             intensity: '自动',
             contextMessages: 8,
@@ -64,11 +67,12 @@ const BUILT_IN_PRESETS = [
     {
         id: 'speed_lite',
         name: '极速轻量',
-        description: '本地 Ollama 模型，无需 API Key，低延迟。适合快速预览。768×1024',
+        description: '本地 Ollama + NoobAI-XL，无需 API Key。768×1024',
         builtIn: true,
         config: {
             provider: 'ollama',
             secondaryProvider: '',
+            modelProfileId: 'noobai_xl_v10',
             style: 'Animagine',
             intensity: '自动',
             contextMessages: 6,
@@ -80,11 +84,12 @@ const BUILT_IN_PRESETS = [
     {
         id: 'character_design',
         name: '角色设计',
-        description: '角色参考图模式，自然光、全身、正面构图。NoobAI-XL。1024×1024',
+        description: '角色参考图模式，NoobAI-XL。1024×1024',
         builtIn: true,
         config: {
             provider: 'deepseek',
             secondaryProvider: '',
+            modelProfileId: 'noobai_xl_v10',
             style: 'Animagine',
             intensity: '无',
             contextMessages: 4,
@@ -175,6 +180,10 @@ class PresetManager {
         if (cfg.provider !== undefined) s.provider = cfg.provider;
         if (cfg.secondaryProvider !== undefined) s.secondaryProvider = cfg.secondaryProvider;
         if (cfg.style !== undefined) s.style = cfg.style;
+        if (cfg.modelProfileId !== undefined) {
+            if (!s.modelProfiles) s.modelProfiles = { activeProfileId: 'noobai_xl_v10' };
+            s.modelProfiles.activeProfileId = cfg.modelProfileId;
+        }
         if (cfg.intensity !== undefined) s.intensity = cfg.intensity;
         if (cfg.contextMessages !== undefined) s.contextMessages = cfg.contextMessages;
         if (cfg.pov !== undefined) s.pov = cfg.pov;
