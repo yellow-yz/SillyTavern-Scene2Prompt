@@ -110,8 +110,22 @@ python main.py --highvram
 | NoobAI-XL | 28 | 4.5 | Euler | Danbooru |
 | WAI Illustrious | 30 | 5 | Euler Ancestral | Danbooru |
 | Animagine XL | 28 | 6 | Euler Ancestral | Danbooru |
+| Hassaku XL | 28 | 6 | Euler Ancestral | Danbooru |
 | Pony v6 | 25 | 7 | Euler Ancestral | Danbooru+score |
 | SDXL Base | 25 | 7 | DPM++ 2M Karras | 自然语言 |
+
+### 模型下载
+
+| 模型 | 用途 | 下载 |
+|------|------|------|
+| **NoobAI-XL v1.0** | 通用动漫（推荐首选） | [Civitai](https://civitai.com/models/1118967) |
+| **WAI Illustrious v1.4** | 韩漫半写实，NSFW 出色 | [Civitai](https://civitai.com/models/140272) |
+| **Animagine XL v3.1** | 精细动漫，SFW 最佳 | [Civitai](https://civitai.com/models/260267) |
+| **Hassaku XL v1.0** | 鲜艳动漫，多人/风景 | [Civitai](https://civitai.com/models/140272?modelVersionId=296830) |
+| **Pony Diffusion v6** | 欧美动漫 | [Civitai](https://civitai.com/models/257749) |
+| **SDXL Base 1.0** | 真实照片风格 | [HuggingFace](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0) |
+
+下载后放入 `ComfyUI/models/checkpoints/` 目录。
 
 ## 使用
 
@@ -213,7 +227,11 @@ AGPL-3.0
 | **NoobAI-XL v1.0** | General anime | [Civitai](https://civitai.com/models/1118967) |
 | **WAI Illustrious v1.4** | Manhwa semi-real | [Civitai](https://civitai.com/models/140272) |
 | **Animagine XL v3.1** | Refined anime SFW | [Civitai](https://civitai.com/models/260267) |
+| **Hassaku XL v1.0** | Bright anime, multi-char | [Civitai](https://civitai.com/models/140272?modelVersionId=296830) |
 | **Pony Diffusion v6** | Western anime | [Civitai](https://civitai.com/models/257749) |
+| **SDXL Base 1.0** | Photorealistic | [HuggingFace](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0) |
+
+Download to `ComfyUI/models/checkpoints/`.
 
 ## License
 
