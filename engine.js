@@ -97,18 +97,42 @@ class S2PEngine {
     /**
      * Full pipeline entry point. Called from SD_PROMPT_PROCESSING handler.
      * @param {object} eventData - The event data from ST
-     * @returns {Promise<{prompt: string, negative: string, analysis: string, method: string}|null>}
+     * @param {object} [options] - { onProgress: (stage, detail) => void, diagnosticMode: 'always'|'off' }
+     * @returns {Promise<{prompt: string, negative: string, analysis: string, method: string, diagnosis: object}|null>}
      */
-    async process(eventData) {
+    async process(eventData, options = {}) {
+        const { onProgress = null, diagnosticMode = 'off' } = options;
+        const t0 = performance.now();
+        const diagnosis = {
+            provider: '', model: '', method: '',
+            llmRaw: '', llmTime: 0,
+            parsedPrompt: '', parsedNegative: '',
+            changes: [],
+            tagCount: 0, tagCountAfter: 0,
+            contentLevel: '', cacheHit: [],
+        };
+
+        // Stage 1: Context
+        if (onProgress) onProgress('context');
+        const t1 = performance.now();
         const ctx = this.collectContext();
         if (!ctx || ctx.length < 10) {
             this.log('聊天内容太短', 'debug');
+            if (onProgress) onProgress('done', { skipped: true });
             return null;
         }
-        this.log(`上下文: ${ctx.length} 字`, 'debug');
+        this.log(`上下文: ${ctx.length} 字 (${Math.round(performance.now() - t1)}ms)`, 'debug');
 
-        // Step 1-2: LLM call with fallback chain
+        // Stage 2: LLM call with fallback chain
+        const s = this.getSettings();
+        const primaryProvider = this.providers.get(s.provider);
+        diagnosis.provider = primaryProvider?.name || s.provider;
+        diagnosis.model = s.providerConfigs?.[s.provider]?.model || '';
+
+        if (onProgress) onProgress('llm', { provider: diagnosis.provider, model: diagnosis.model });
+        const t2 = performance.now();
         let result = await this.callLLM(ctx);
+        diagnosis.llmTime = Math.round(performance.now() - t2);
         let method = result.provider || 'Unknown';
 
         if (!result?.positive) {
@@ -120,26 +144,51 @@ class S2PEngine {
 
         if (!result?.positive) {
             this.log('提示词生成完全失败', 'error');
+            if (onProgress) onProgress('done', { error: true });
             return null;
         }
 
-        // Step 3: Inject appearance cache
+        diagnosis.method = result.method || method;
+        diagnosis.llmRaw = result._raw || '';
+        diagnosis.parsedPrompt = result.positive;
+        diagnosis.parsedNegative = result.negative || '';
+
+        // Track cache hits
+        const cache = s.appearanceCache || {};
+        const cacheKeys = Object.keys(cache).filter(k => cache[k]?.length > 5);
+        diagnosis.cacheHit = cacheKeys.filter(name => result.positive.includes(name));
+
+        // Stage 3: Post-processing
+        if (onProgress) onProgress('postprocess');
+        const t3 = performance.now();
+
+        // Inject appearance
         let finalPrompt = this.injectAppearance(result.positive);
         finalPrompt = this.injectUserAppearance(finalPrompt);
 
-        // Step 4: Post-processing
-        finalPrompt = this.cleanConflicts(finalPrompt);
+        // Count tags before
+        diagnosis.tagCount = (finalPrompt.match(/,/g) || []).length + 1;
 
-        // Step 5: Content level gating
+        // Clean conflicts
+        const cleaned = this.cleanConflicts(finalPrompt);
+        finalPrompt = cleaned.prompt;
+        diagnosis.changes = cleaned.changes || [];
+
+        // Content level gating
         finalPrompt = this.enforceContentLevel(finalPrompt, ctx);
+        diagnosis.contentLevel = s.intensity || '自动';
 
-        // Step 6: Anti-censor negative
+        // Count tags after
+        diagnosis.tagCountAfter = (finalPrompt.match(/,/g) || []).length + 1;
+
+        const postTime = Math.round(performance.now() - t3);
+
+        // Stage 4: Anti-censor negative
         const negative = this.buildNegative(result.negative || '');
 
         // Inject into ST pipeline
         eventData.prompt = finalPrompt;
 
-        // Also set negative via sd settings (best effort — may race with ST's own capture)
         if (negative.length > 10) {
             extension_settings.sd.negative_prompt = negative;
             saveSettingsDebounced();
@@ -149,17 +198,21 @@ class S2PEngine {
         if (result.analysis) {
             this.log('分析: ' + result.analysis, 'info');
         }
-        this.log(`增强完成 (${method})`, 'info');
+        this.log(`增强完成 (${method}) LLM:${diagnosis.llmTime}ms 后处理:${postTime}ms`, 'info');
         this.log('--- 正向提示词前300字 ---');
         this.log(finalPrompt.substring(0, 300));
         this.log('--- 反向提示词前300字 ---');
         this.log(negative.substring(0, 300));
+
+        const totalTime = Math.round(performance.now() - t0);
+        if (onProgress) onProgress('done', { totalTime });
 
         return {
             prompt: finalPrompt,
             negative: negative,
             analysis: result.analysis || '',
             method: result.method || method,
+            diagnosis,
         };
     }
 
@@ -320,6 +373,7 @@ ${sceneText}
 
         const parsed = this.parseResponse(result.raw);
         parsed.provider = result.provider;
+        parsed._raw = result.raw; // Preserve raw output for diagnosis
         return parsed;
     }
 
@@ -477,31 +531,40 @@ ${sceneText}
     // ═══════════════════════════════════════════════
 
     cleanConflicts(prompt) {
+        const changes = [];
+        const addChange = (msg) => changes.push(msg);
+
         const hasExplicit = /pussy|labia|clitoris|penis|penetration|fellatio|blowjob|cunnilingus|missionary|doggystyle|cowgirl|creampie/i.test(prompt);
 
         let lines = prompt.split('\n');
-        if (lines.length < 3) return prompt;
+        if (lines.length < 3) return { prompt, changes };
 
         // 0. Quality line alignment
         if (lines[0]) {
             lines[0] = '(masterpiece:1.3), (best quality:1.3), (amazing quality:1.2), (very aesthetic:1.2), absurdres, (uncensored:1.4), (no censor:1.3), (semi-realistic:1.2), (detailed:1.2), (highres:1.2), (natural skin:1.2), (skin texture:1.1)';
+            addChange('品质行已对齐至标准 WAI 标签');
         }
 
         // 0.5. Banned words
+        let bannedCount = 0;
         const stripWords = ['korean aesthetic', 'realistic skin', 'anime coloring', 'cel shading', 'cartoon', 'sharp anime eyes', 'photorealistic', 'raw photo'];
         for (let i = 1; i < lines.length; i++) {
             if (!lines[i]) continue;
             for (const w of stripWords) {
+                const before = lines[i];
                 lines[i] = lines[i].replace(new RegExp(`\\(${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^)]*\\)\\s*,?\\s*`, 'gi'), '');
                 lines[i] = lines[i].replace(new RegExp(`,\\s*${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'), '');
                 lines[i] = lines[i].replace(new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*,?\\s*`, 'gi'), '');
+                if (lines[i] !== before) bannedCount++;
             }
         }
+        if (bannedCount > 0) addChange(`违禁词清理: ${bannedCount} 处`);
 
         // 0.6. Tag cap <= 120
         let totalTags = 0;
         for (let i = 0; i < lines.length; i++) { totalTags += (lines[i].match(/,/g) || []).length + 1; }
         if (totalTags > 120) {
+            const beforeCap = totalTags;
             const trimOrder = [5, 4, 3, 0, 2, 1];
             for (const idx of trimOrder) {
                 if (totalTags <= 120) break;
@@ -513,6 +576,7 @@ ${sceneText}
                 totalTags = 0;
                 for (let j = 0; j < lines.length; j++) { totalTags += (lines[j].match(/,/g) || []).length + 1; }
             }
+            addChange(`标签上限: ${beforeCap} → ${totalTags} (限制 120)`);
         }
 
         // 1-5: NSFW-specific conflict resolution
@@ -523,14 +587,17 @@ ${sceneText}
                 lines[2] = actionLine.replace(/\(legs spread[^)]*\)/gi, '').replace(/\(spread legs[^)]*\)/gi, '')
                     .replace(/\(pussy[^)]*\)/gi, '').replace(/\(labia[^)]*\)/gi, '').replace(/\(clitoris[^)]*\)/gi, '')
                     .replace(/\(spread pussy[^)]*\)/gi, '').replace(/\(wet pussy[^)]*\)/gi, '').replace(/\(pussy juice[^)]*\)/gi, '');
+                addChange('冲突解决: 口交 + 张开腿 → 移除性器官标签');
             }
             if (/on back/i.test(actionLine) && /kneeling/i.test(actionLine)) {
                 lines[2] = actionLine.replace(/\(on back[^)]*\)/gi, '').replace(/\bon back\b/gi, '');
+                addChange('冲突解决: 仰卧 + 跪姿 → 移除仰卧');
             }
 
             // 2. close-up / cowboy shot conflicts
             if (/close-up/i.test(prompt) && /(?:legs|spread|kneeling|lying|cowgirl|missionary|doggystyle|full body)/i.test(prompt)) {
                 for (let i = 0; i < lines.length; i++) { lines[i] = lines[i].replace(/\(close-up[^)]*\)/gi, '').replace(/\bclose-up\b/gi, ''); }
+                addChange('冲突解决: close-up + 全身动作 → 移除 close-up');
             }
             if (/(?:from above|from below|POV|spread|lying)/i.test(prompt)) {
                 for (let i = 0; i < lines.length; i++) { lines[i] = lines[i].replace(/\(cowboy shot[^)]*\)/gi, '').replace(/\bcowboy shot\b/gi, ''); }
@@ -541,17 +608,18 @@ ${sceneText}
             if (!/(?:\dgirl|\dboy|1girl|1boy|solo focus|1other|multiple|group)/i.test(wholePrompt)) {
                 const povMode = /solo focus|POV|first person/i.test(prompt);
                 lines.splice(1, 0, povMode ? 'solo focus, (looking at viewer:1.5), (POV:1.4), POV, first person view' : '(1girl:1.4), female');
+                addChange(povMode ? '自动补全: POV 主体行' : '自动补全: 1girl 主体行');
             }
 
             // 3b. Multi-character detection
-            const actionLine2 = lines[2] || '';
             const subjLine = lines[1] || '';
-            if (/(?:two women|two girls|two people|mother and daughter|double|both|她们|两人|二人|母女)/i.test(actionLine2) && /1girl\b/i.test(subjLine) && !/2girls|3girls|1boy/i.test(subjLine)) {
+            if (/(?:two women|two girls|two people|mother and daughter|double|both|她们|两人|二人|母女)/i.test(lines[2] || '') && /1girl\b/i.test(subjLine) && !/2girls|3girls|1boy/i.test(subjLine)) {
                 lines[1] = subjLine.replace(/\b1girl\b/gi, '2girls');
+                addChange('多人检测: 1girl → 2girls');
                 this.log('多人检测: 1girl → 2girls', 'info');
             }
 
-            // 4. Body line (lines[4]) cleanup
+            // 4. Body line cleanup
             const sexBodyTags = /\b(?:dark nipples|pink nipples|erect nipples|nipples|areola|labia|clitoris|pussy|penis|glans|pubic hair|wet pussy|pussy juice|grool|semen|cum|wet)(?::\d+\.\d+)?\b/gi;
             const conflicts = /\b(?:mother|motherly|maternal|warm smile|gentle eyes|gentle expression|soft eyes|soft expression|soft features|wholesome|innocent|pure|modest|proper|pregnant|pregnancy|pregnant scar|pregnant belly|pregnancy stretch marks|from behind|cowboy shot)(?::\d+\.\d+)?\b/gi;
             if (lines[4]) {
@@ -572,15 +640,20 @@ ${sceneText}
             if (subjRegex.test(lines[i])) { firstSubj = i; break; }
         }
         if (firstSubj >= 0) {
+            let dupCount = 0;
             for (let i = firstSubj + 1; i < lines.length; i++) {
-                if (subjRegex.test(lines[i])) lines[i] = '';
+                if (subjRegex.test(lines[i])) { lines[i] = ''; dupCount++; }
             }
-            lines = lines.filter(l => l.trim() !== '');
+            if (dupCount > 0) {
+                lines = lines.filter(l => l.trim() !== '');
+                addChange(`重复主体行: 移除 ${dupCount} 行`);
+            }
         }
 
         // 6. Auto-add "on back" for spread legs
         if (/(?:spread legs|legs spread)/i.test(lines[2] || '') && !/(?:on back|lying|on bed|reclining)/i.test(lines[2] || '')) {
             lines[2] = '(on back:1.3), (lying:1.2), ' + lines[2];
+            addChange('自动补全: spread legs → +on back+lying');
         }
 
         // 7. Scene keywords to action line
@@ -590,6 +663,7 @@ ${sceneText}
                 const unique = [...new Set(sceneKeywords)].slice(0, 3);
                 if (!new RegExp(unique.join('|'), 'i').test(lines[2] || '')) {
                     lines[2] = (lines[2] || '') + ', ' + unique.join(', ');
+                    addChange(`场景关键词前移: ${unique.join(', ')}`);
                 }
             }
         }
@@ -610,11 +684,13 @@ ${sceneText}
         result = result.replace(/\(\s*\)\s*,?\s*/g, '').replace(/, ,/g, ',').replace(/,\s*,/g, ',').replace(/^\s*,\s*/gm, '').replace(/,\s*$/gm, '');
 
         // 9. Global tag dedup (cross-line)
+        let dedupCount = 0;
         const dedupLines = result.split('\n');
         const seen = new Set();
         for (let i = 0; i < dedupLines.length; i++) {
             if (!dedupLines[i]) continue;
             let tags = dedupLines[i].split(',').map(t => t.trim()).filter(Boolean);
+            const before = tags.length;
             tags = tags.filter(t => {
                 const base = t.replace(/[()]/g, '').split(':')[0].trim().toLowerCase();
                 if (!base || base.length < 2) return false;
@@ -622,10 +698,13 @@ ${sceneText}
                 seen.add(base);
                 return true;
             });
+            dedupCount += before - tags.length;
             dedupLines[i] = tags.join(', ');
         }
+        if (dedupCount > 0) addChange(`标签去重: ${dedupCount} 个重复标签`);
+
         result = dedupLines.join('\n');
-        return result;
+        return { prompt: result, changes };
     }
 
     // ═══════════════════════════════════════════════
@@ -684,14 +763,27 @@ ${sceneText}
     // Appearance Extraction
     // ═══════════════════════════════════════════════
 
-    async extractAppearance() {
-        const ctx = getContext();
-        const charName = ctx.name2 || '未知角色';
-        const char = ctx.characters?.[ctx.characterId];
-        const desc = char?.description || '';
-        if (!desc) { this.log('该角色无描述', 'error'); return; }
+    /**
+     * Extract appearance tags from a character card.
+     * @param {string} [charName] - Character name (auto-detected from context if omitted)
+     * @param {string} [charDescription] - Character description (auto-detected if omitted)
+     * @returns {Promise<boolean>} true if extraction succeeded
+     */
+    async extractAppearance(charName, charDescription) {
+        let name = charName;
+        let desc = charDescription;
 
-        this.log('正在提取外貌: ' + charName, 'info');
+        // Auto-detect from current context if not provided
+        if (!name || !desc) {
+            const ctx = getContext();
+            name = name || ctx.name2 || '未知角色';
+            const char = ctx.characters?.[ctx.characterId];
+            desc = desc || char?.description || '';
+        }
+
+        if (!desc) { this.log('该角色无描述', 'error'); return false; }
+
+        this.log('正在提取外貌: ' + name, 'info');
 
         const extractMsg = `从角色设定中提取永久外貌特征（这些特征在任何场景都不变）。只输出英文 Danbooru 标签，逗号分隔。
 
@@ -713,22 +805,24 @@ ${desc.substring(0, 1500)}
 
         if (!provider || !provider.isConfigured(s)) {
             this.log('无法提取外貌: Provider 未配置', 'error');
-            return;
+            return false;
         }
 
         try {
             const raw = await provider.call('You are a character appearance extractor. Output only Danbooru tags.', extractMsg, s);
             if (raw && raw.length > 5) {
                 const clean = raw.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-                s.appearanceCache[charName] = clean;
+                s.appearanceCache[name] = clean;
                 saveSettingsDebounced();
                 this.log('外貌已缓存: ' + clean, 'info');
                 const el = document.getElementById('s2p_cache');
                 if (el) el.value = clean;
+                return true;
             }
         } catch (e) {
-            this.log('外貌提取失败: ' + e.message, 'error');
+            this.log('外貌提取失败 (' + name + '): ' + e.message, 'error');
         }
+        return false;
     }
 
     // ═══════════════════════════════════════════════

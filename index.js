@@ -16,6 +16,7 @@ import {
     getContext,
     renderExtensionTemplateAsync
 } from '../../../extensions.js';
+import { Popup, POPUP_TYPE } from '../../../popup.js';
 
 // ═══════════════════════════════════════════════════════════
 // Module-level state (populated during init)
@@ -65,6 +66,9 @@ const DEFAULT_SETTINGS = {
         custom: [],            // User-created presets
         activePresetId: 'manhwa_specialized',
     },
+
+    // Diagnostic
+    diagnosticMode: 'off',    // 'always' | 'off'
 
     // Advanced
     logLevel: 'info',         // debug / info / error / silent
@@ -199,12 +203,7 @@ function injectGenButton() {
             sendArea.click();
         });
 
-        const statusEl = document.createElement('span');
-        statusEl.id = 's2p_status';
-        statusEl.style.cssText = 'margin:0 4px;font-size:11px;color:#ddaa66;white-space:nowrap';
-
         sendArea.parentNode.insertBefore(btn, sendArea.nextSibling);
-        sendArea.parentNode.insertBefore(statusEl, btn.nextSibling);
     };
     tryInject();
 }
@@ -406,6 +405,21 @@ function bindSettingsEvents() {
         if (el) el.value = '';
     });
 
+    // Diagnostic mode
+    bind('s2p_diag_off', 'change', function() { if (this.checked) { s.diagnosticMode = 'off'; saveSettingsDebounced(); } });
+    bind('s2p_diag_always', 'change', function() { if (this.checked) { s.diagnosticMode = 'always'; saveSettingsDebounced(); } });
+
+    // Batch appearance extraction
+    bind('s2p_batch_extract', 'click', () => batchExtractAppearance());
+    bind('s2p_clear_cache', 'click', () => {
+        if (confirm('确定清空所有角色外貌缓存？')) {
+            s.appearanceCache = {};
+            saveSettingsDebounced();
+            updateCacheListUI();
+            log('外貌缓存已全部清空', 'info');
+        }
+    });
+
     // Test connection
     bind('s2p_test_connection', 'click', async () => {
         await testConnection();
@@ -464,6 +478,13 @@ function updateSettingsUI() {
     setVal('s2p_timeout', s.providerTimeout);
     setVal('s2p_max_retries', s.maxRetries);
     setVal('s2p_system_prompt_override', s.systemPromptOverride);
+
+    // Diagnostic
+    setCheck('s2p_diag_off', s.diagnosticMode === 'off');
+    setCheck('s2p_diag_always', s.diagnosticMode === 'always');
+
+    // Cache list
+    setTimeout(updateCacheListUI, 200);
 }
 
 /**
@@ -525,47 +546,250 @@ function updatePresetUI() {
     }
 }
 
-/**
- * Test the configured LLM provider connection.
- */
+// ═══════════════════════════════════════════════════════════
+// Button state helper
+// ═══════════════════════════════════════════════════════════
+
+function setGenButtonState(text) {
+    const btn = document.getElementById('s2p_gen_btn');
+    if (!btn) return;
+    if (text) {
+        btn.textContent = text;
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+    } else {
+        btn.textContent = '画面';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Diagnostic Popup (Prompt Inspector)
+// ═══════════════════════════════════════════════════════════
+
+async function showDiagnosticPopup(result, eventData) {
+    const d = result.diagnosis || {};
+    const changesText = (d.changes && d.changes.length > 0)
+        ? d.changes.map(c => '• ' + c).join('\n')
+        : '（无变更）';
+
+    const content = `
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:70vh">
+        <div style="display:flex;gap:8px;flex:1;min-height:300px">
+            <div style="flex:1;display:flex;flex-direction:column">
+                <small style="color:#aaa">LLM 原始输出</small>
+                <textarea readonly class="text_pole" style="flex:1;font-size:10px;font-family:monospace;resize:none">${escapeHtml(d.llmRaw || '')}</textarea>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column">
+                <small style="color:#88cc88">正向提示词（可编辑）</small>
+                <textarea id="s2p_diag_prompt" class="text_pole" style="flex:1;font-size:10px;font-family:monospace;resize:none">${escapeHtml(result.prompt)}</textarea>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column">
+                <small style="color:#ddaa66">后处理变更</small>
+                <textarea readonly class="text_pole" style="flex:1;font-size:10px;font-family:monospace;resize:none;background:#1a1a1a">${escapeHtml(changesText)}</textarea>
+            </div>
+        </div>
+        <div style="font-size:11px;color:#888;border-top:1px solid #333;padding-top:4px">
+            Provider: ${escapeHtml(d.provider || '?')} | 模型: ${escapeHtml(d.model || '?')} | LLM响应: ${d.llmTime || '?'}ms |
+            标签: ${d.tagCount || '?'} → ${d.tagCountAfter || '?'} | 缓存命中: ${(d.cacheHit || []).join(', ') || '无'}
+        </div>
+    </div>`;
+
+    const popup = new Popup(content, POPUP_TYPE.CONFIRM, '诊断模式 — Prompt Inspector', { okButton: '发送', cancelButton: '取消' });
+    const confirmed = await popup.show();
+
+    if (!confirmed) {
+        log('用户取消发送', 'info');
+        return false;
+    }
+
+    // Use edited prompt if user modified it
+    const editedPrompt = document.getElementById('s2p_diag_prompt')?.value;
+    if (editedPrompt && editedPrompt !== result.prompt) {
+        result.prompt = editedPrompt;
+        log('用户编辑了提示词', 'info');
+    }
+    return true;
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Batch Appearance Extraction
+// ═══════════════════════════════════════════════════════════
+
+async function batchExtractAppearance() {
+    if (!engine) return;
+    const ctx = getContext();
+    const chars = ctx.characters || {};
+    const charList = Object.entries(chars).filter(([, c]) => c.description);
+
+    if (charList.length === 0) {
+        alert('没有找到有角色卡描述的角色');
+        return;
+    }
+
+    const s = getSettings();
+    const cached = Object.keys(s.appearanceCache).filter(k => s.appearanceCache[k]?.length > 5);
+    const toExtract = charList.filter(([, c]) => !cached.includes(c.name));
+
+    if (toExtract.length === 0) {
+        alert('所有角色已有外貌缓存');
+        return;
+    }
+
+    if (!confirm(`将为 ${toExtract.length} 个角色提取外貌（已有缓存的跳过）：\n\n${toExtract.map(([,c]) => '• ' + c.name).join('\n')}\n\n确定？`)) {
+        return;
+    }
+
+    let done = 0;
+    for (const [, char] of toExtract) {
+        const statusEl = document.getElementById('s2p_panel_status');
+        if (statusEl) statusEl.textContent = `提取外貌 ${char.name} (${done + 1}/${toExtract.length})...`;
+
+        const success = await engine.extractAppearance(char.name, char.description);
+        done++;
+        if (success) {
+            log(`外貌提取 [${done}/${toExtract.length}]: ${char.name} ✓`, 'info');
+        } else {
+            log(`外貌提取 [${done}/${toExtract.length}]: ${char.name} ✗`, 'error');
+        }
+    }
+
+    const statusEl = document.getElementById('s2p_panel_status');
+    if (statusEl) statusEl.textContent = `提取完成 (${done} 个角色)`;
+    setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+
+    updateSettingsUI();
+    updateCacheListUI();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Cache List UI
+// ═══════════════════════════════════════════════════════════
+
+function updateCacheListUI() {
+    const container = document.getElementById('s2p_cache_list');
+    if (!container) return;
+
+    const ctx = getContext();
+    const chars = ctx.characters || {};
+    const s = getSettings();
+    const cache = s.appearanceCache || {};
+
+    // Build cache entries from characters + cache
+    const allChars = Object.entries(chars).filter(([, c]) => c.description);
+    if (allChars.length === 0) {
+        container.innerHTML = '<small style="color:#666">没有找到角色卡</small>';
+        return;
+    }
+
+    let html = '';
+    let cachedCount = 0;
+    for (const [, char] of allChars) {
+        const tags = cache[char.name];
+        if (tags && tags.length > 5) {
+            cachedCount++;
+            const preview = tags.length > 50 ? tags.substring(0, 50) + '...' : tags;
+            html += `<div class="s2p-preset-item">
+                <span>${escapeHtml(char.name)} — <span style="color:#88cc88;font-size:10px">${escapeHtml(preview)}</span></span>
+                <button class="s2p-btn s2p-btn-sm" onclick="window._s2pDelCache('${escapeHtml(char.name)}')">删除</button>
+            </div>`;
+        } else {
+            html += `<div class="s2p-preset-item">
+                <span>${escapeHtml(char.name)} — <span style="color:#666;font-size:10px">(未缓存)</span></span>
+                <button class="s2p-btn s2p-btn-sm" onclick="window._s2pExtractOne('${escapeHtml(char.name)}')">提取</button>
+            </div>`;
+        }
+    }
+    container.innerHTML = html;
+    container.dataset.count = cachedCount + '/' + allChars.length;
+}
+
+// Global helpers for cache list buttons
+window._s2pDelCache = function(name) {
+    const s = getSettings();
+    delete s.appearanceCache[name];
+    saveSettingsDebounced();
+    updateCacheListUI();
+    log('已删除外貌缓存: ' + name, 'info');
+};
+window._s2pExtractOne = async function(name) {
+    const ctx = getContext();
+    const char = Object.values(ctx.characters || {}).find(c => c.name === name);
+    if (char && engine) {
+        await engine.extractAppearance(name, char.description);
+        updateSettingsUI();
+        updateCacheListUI();
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+// Enhanced Test Connection
+// ═══════════════════════════════════════════════════════════
+
 async function testConnection() {
     const btn = document.getElementById('s2p_test_connection');
     if (btn) { btn.disabled = true; btn.textContent = '测试中...'; }
 
-    const statusEl = document.getElementById('s2p_connection_status');
-    if (statusEl) { statusEl.textContent = '测试中...'; statusEl.className = 's2p-status'; }
+    const s = getSettings();
+    const primaryId = s.provider;
+    const config = s.providerConfigs?.[primaryId] || {};
+    const model = config.model || '?';
+
+    let report = '';
 
     try {
-        // Test message: a simple request to validate API key and endpoint
-        const testMsg = [{ role: 'user', content: 'Reply with just: OK' }];
+        if (!providerRegistry) throw new Error('Provider 系统尚未初始化');
 
-        if (!providerRegistry) {
-            throw new Error('Provider 系统尚未初始化');
-        }
-
-        const s = getSettings();
-        const primaryId = s.provider;
         const provider = providerRegistry.get(primaryId);
-
         if (!provider) throw new Error(`未找到 Provider: ${primaryId}`);
         if (!provider.isConfigured(s)) throw new Error(`${provider.name} 未配置（请填写 API Key）`);
 
-        const startTime = Date.now();
-        const raw = await provider.call('', 'Reply with just: OK', s);
-        const elapsed = Date.now() - startTime;
+        const startTime = performance.now();
+        const raw = await provider.call('', 'Hi', s);
+        const elapsed = Math.round(performance.now() - startTime);
 
-        if (raw && raw.length > 0) {
-            if (statusEl) { statusEl.textContent = `连接成功 (${elapsed}ms)`; statusEl.className = 's2p-status s2p-status-ok'; }
-            log(`Provider ${provider.name} 连接成功 (${elapsed}ms)`, 'info');
-        } else {
-            throw new Error('返回内容为空');
-        }
+        report = `Provider: ${provider.name}
+URL: ${provider.buildUrl(config)}
+HTTP 状态: 200 OK ✅
+响应延迟: ${elapsed}ms
+模型: ${model}
+━━━━━━━━━━━━━━━━━━
+✅ 连接正常，可以开始生图`;
+
+        log(`Provider ${provider.name} 连接成功 (${elapsed}ms)`, 'info');
     } catch (e) {
-        if (statusEl) { statusEl.textContent = `连接失败: ${e.message}`; statusEl.className = 's2p-status s2p-status-err'; }
-        log(`连接测试失败: ${e.message}`, 'error');
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = '测试连接'; }
+        const msg = e.message || String(e);
+        let hint = '';
+        if (msg.includes('401')) hint = '\n💡 API Key 无效，请检查是否正确';
+        else if (msg.includes('404')) hint = `\n💡 模型不存在，确认模型名是否正确（当前: ${model}）`;
+        else if (msg.includes('超时') || msg.includes('timeout')) hint = '\n💡 请求超时，检查网络或增大超时时间';
+        else if (msg.includes('CORS') || msg.includes('NetworkError')) hint = '\n💡 网络错误。Ollama 需加 OLLAMA_ORIGINS=* 启动；其他 Provider 一般支持浏览器调用';
+        else if (msg.includes('Failed to fetch')) hint = '\n💡 无法连接到 API 服务器，检查网络和代理设置';
+
+        report = `Provider: ${primaryId}
+URL: ${providerRegistry?.get(primaryId)?.buildUrl(config) || '?'}
+❌ 连接失败
+错误: ${msg}${hint}`;
+
+        log(`连接测试失败: ${msg}`, 'error');
     }
+
+    // Show report in popup
+    const popup = new Popup(
+        `<pre style="font-size:12px;white-space:pre-wrap;font-family:Consolas,Monaco,monospace">${escapeHtml(report)}</pre>`,
+        POPUP_TYPE.TEXT,
+        '连接测试报告'
+    );
+    await popup.show();
+
+    if (btn) { btn.disabled = false; btn.textContent = '测试连接'; }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -576,29 +800,39 @@ async function onPromptProcessing(eventData) {
     const s = getSettings();
     if (!s.enabled) return;
 
-    // If engine not loaded yet, skip (should only happen briefly during init)
     if (!engine) {
         log('引擎尚未初始化，跳过生图事件', 'debug');
         return;
     }
 
-    const statusEls = ['s2p_status', 's2p_panel_status'];
-    const setStatus = (text) => {
-        statusEls.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = text;
-        });
-    };
-
     log('生图事件触发 | 模式: ' + (eventData.generationType || '?'), 'debug');
 
     try {
-        setStatus('生成中...');
-        const result = await engine.process(eventData);
+        setGenButtonState('生成中...');
+        const diagMode = s.diagnosticMode || 'off';
+        const result = await engine.process(eventData, {
+            onProgress: (stage) => {
+                if (stage === 'llm') setGenButtonState('LLM请求中...');
+                else if (stage === 'postprocess') setGenButtonState('后处理中...');
+            },
+            diagnosticMode: diagMode,
+        });
 
         if (!result || !result.prompt) {
-            setStatus('提示词生成失败');
+            setGenButtonState(null);
+            log('提示词生成失败', 'error');
             return;
+        }
+
+        // Diagnostic popup if enabled
+        if (diagMode === 'always' && result.diagnosis) {
+            const confirmed = await showDiagnosticPopup(result, eventData);
+            if (!confirmed) {
+                setGenButtonState(null);
+                log('用户取消发送', 'info');
+                return;
+            }
+            eventData.prompt = result.prompt;
         }
 
         // Store for preview
@@ -611,12 +845,11 @@ async function onPromptProcessing(eventData) {
         const negBox = document.getElementById('s2p_neg_preview');
         if (negBox && result.negative) { negBox.value = result.negative; negBox.style.display = ''; }
 
-        setStatus('已发送 (' + result.method + ')');
-        setTimeout(() => setStatus(''), 15000);
+        setGenButtonState(null);
 
     } catch (e) {
+        setGenButtonState(null);
         log('生图事件处理错误: ' + e.message, 'error');
-        setStatus('错误: ' + e.message);
     }
 }
 
@@ -671,7 +904,7 @@ export async function init() {
     // 3. Register event handler
     eventSource.on(event_types.SD_PROMPT_PROCESSING, onPromptProcessing);
 
-    // 4. Initialize UI
+    // 5. Initialize UI
     await initUI();
 
     // 5. Inject "画面" button

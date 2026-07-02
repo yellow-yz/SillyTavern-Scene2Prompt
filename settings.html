@@ -199,8 +199,31 @@
 
             <hr class="s2p-hr">
 
+            <!-- Diagnostic Mode -->
+            <div class="s2p-section-title">诊断模式</div>
+            <div class="s2p-row">
+                <label style="font-size:11px;cursor:pointer">
+                    <input type="radio" name="s2p_diag" id="s2p_diag_off" checked>
+                    <span>直接发送（无预览）</span>
+                </label>
+            </div>
+            <div class="s2p-row">
+                <label style="font-size:11px;cursor:pointer">
+                    <input type="radio" name="s2p_diag" id="s2p_diag_always">
+                    <span>始终预览提示词</span>
+                </label>
+                <span class="s2p-hint">（生成后弹出编辑器，可修改后再发送）</span>
+            </div>
+
+            <hr class="s2p-hr">
+
             <!-- Appearance -->
             <div class="s2p-section-title">角色外貌管理</div>
+            <div class="s2p-row" style="margin-bottom:4px">
+                <button id="s2p_batch_extract" class="s2p-btn s2p-btn-sm">批量提取所有角色</button>
+                <button id="s2p_clear_cache" class="s2p-btn s2p-btn-sm s2p-btn-danger">清空全部缓存</button>
+            </div>
+            <div id="s2p_cache_list" style="max-height:150px;overflow-y:auto;margin-bottom:4px"></div>
             <div>
                 <span class="s2p-label">当前角色外貌标签</span>
                 <button id="s2p_extract" class="s2p-btn s2p-btn-sm" style="margin-left:6px">重新提取</button>
