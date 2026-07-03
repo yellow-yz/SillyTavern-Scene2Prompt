@@ -5,7 +5,7 @@
             "cfg": 4,
             "denoise": 1,
             "latent_image": ["5", 0],
-            "model": ["4", 0],
+            "model": ["11", 0],
             "negative": ["7", 0],
             "positive": ["6", 0],
             "sampler_name": "euler",
@@ -13,11 +13,12 @@
             "seed": "%seed%",
             "steps": 28
         },
-        "_meta": {"title": "NoobAI v-pred: Euler+Simple, CFG=4"}
+        "_meta": {"title": "采样 (Euler+Simple, CFG=4)"}
     },
     "4": {
         "class_type": "CheckpointLoaderSimple",
-        "inputs": {"ckpt_name": "%model%"}
+        "inputs": {"ckpt_name": "%model%"},
+        "_meta": {"title": "加载模型"}
     },
     "5": {
         "class_type": "EmptyLatentImage",
@@ -44,5 +45,14 @@
     "10": {
         "class_type": "SaveImage",
         "inputs": {"filename_prefix": "S2P", "images": ["8", 0]}
+    },
+    "11": {
+        "class_type": "ModelSamplingDiscrete",
+        "inputs": {
+            "model": ["4", 0],
+            "sampling": "v_prediction",
+            "zsnr": true
+        },
+        "_meta": {"title": "强制 v-prediction + Zero SNR"}
     }
 }
