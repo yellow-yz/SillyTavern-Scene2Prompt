@@ -212,6 +212,20 @@ function buildDanbooruPrompt(profile) {
   4人+: wide shot / group shot / from above
   战斗: dynamic angle / from side / action shot
   亲密: POV / close-up / from above
+
+★ 光线氛围（第6行必须包含1-2个光线标签，根据场景时间/情绪选择）:
+  温馨/浪漫: warm lighting, (golden hour:1.2), (soft light:1.3), lens flare, sunset
+  安静/平和: (soft lighting:1.3), (gentle light:1.2), afternoon light, (diffused light:1.2)
+  悲伤/压抑: dim lighting, (cold light:1.3), overcast, grey sky, rain, (dark shadows:1.2)
+  紧张/恐怖: (harsh shadows:1.3), low light, (chiaroscuro:1.2), fog, dark, (eerie:1.3)
+  清新/明亮: bright lighting, morning light, sunlight, (god rays:1.2), (dappled light:1.2)
+  神秘/梦幻: moonlight, (ethereal:1.3), (bioluminescence:1.2), nebula, floating dust, (starlight:1.2)
+  室内人造光: fluorescent light, (lamp light:1.2), (candlelight:1.3), (warm lamp:1.2), (neon light:1.2)
+  夜景户外: night, (city lights:1.2), street lamp, (neon reflection:1.1), (fireworks:1.3)
+  雨天: rain, (wet ground:1.2), overcast, (reflections:1.2), (droplets:1.1)
+  雾天: fog, (mist:1.2), (atmospheric perspective:1.3), ethereal
+  背光/逆光: backlighting, (rim light:1.3), (silhouette:1.2), (contre-jour:1.2)
+  棚拍/干净: studio lighting, (white background:1.1), (softbox:1.1), (clean light:1.2)
   日常: from front / wide shot
 
 ${notes}${extraRules}
@@ -239,7 +253,15 @@ function buildNaturalPrompt(profile) {
 
 [POSITIVE]
 一段 100-250 字英文画面描述，自然段落格式：
-  构图和视角、人物外貌姿势表情、服装细节（以聊天记录为准）、场景环境物品、光照氛围
+  构图和视角、人物外貌姿势表情、服装细节（以聊天记录为准）、场景环境物品
+  光线氛围（★ 必须包含，根据场景情绪选择）:
+    温馨→warm golden hour lighting, soft glow, lens flare
+    安静→soft diffused lighting, gentle afternoon light
+    悲伤→cold dim lighting, overcast grey sky, rain
+    紧张→harsh shadows, low light, fog, chiaroscuro
+    清新→bright morning sunlight, god rays, dappled light
+    神秘→ethereal moonlight, bioluminescence, starlight
+    室内→warm lamp light, candlelight, fluorescent, neon
 
 ★ 多人场景（2人及以上）:
   用空间位置描述每个角色，句式: "On the left, [name1] is [action] with [expression]. On the right, [name2] [action] with [expression]. They are [facing each other / standing side by side / one behind the other]."

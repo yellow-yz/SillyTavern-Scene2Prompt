@@ -65,6 +65,74 @@ lowres, (bad quality:1.2), (worst quality:1.2), bad anatomy, sketch, jpeg artifa
 // Anti-censor tags (only applied when content level = 显式 or 软色情)
 const ANTI_CENSOR_TAGS = '(censored:1.9), (mosaic:1.9), (white censor bar:1.9), white bar, (white line:1.8), (white glow:1.8), (light beam:1.8), (light bar:1.8), (nipple censor:1.7), (genital mosaic:1.9), (steam censor:1.6), (pixelation:1.9), (censor bar:1.9), censored';
 
+// Emotion detection: Chinese keywords → Danbooru expression tags
+const EMOTION_MAP = {
+    '害羞': 'blush, embarrassed, looking away, (shy:1.2)',
+    '脸红': 'blush, (red cheeks:1.2), embarrassed',
+    '不好意思': 'blush, embarrassed, looking down',
+    '愤怒': 'angry, (clenched teeth:1.1), furrowed brow',
+    '生气': 'angry, glaring, (irritated:1.1)',
+    '恼怒': 'annoyed, (vein:1.1), frowning',
+    '开心': 'smile, laughing, closed eyes, (happy:1.2)',
+    '高兴': 'smile, (grin:1.1), bright eyes',
+    '笑': 'smile, laughing, (joy:1.1)',
+    '悲伤': 'tears, crying, sad expression, (teardrops:1.2)',
+    '难过': 'sad, frowning, downcast eyes, (sad:1.2)',
+    '哭': 'tears, crying, (streaming tears:1.3)',
+    '哭泣': 'tears, crying, sobbing',
+    '惊讶': 'surprised, wide eyes, open mouth, (shocked:1.2)',
+    '吃惊': 'surprised, raised eyebrows, (startled:1.1)',
+    '紧张': 'nervous, fidgeting, sweating, (anxious:1.2)',
+    '不安': 'nervous, (uneasy:1.1), fidgeting',
+    '害怕': 'scared, trembling, (fear:1.2), wide eyes',
+    '恐惧': 'terrified, (horror:1.3), pale',
+    '温柔': 'gentle smile, soft eyes, (tender:1.2)',
+    '冷漠': 'cold stare, poker face, expressionless',
+    '冷淡': 'expressionless, cold eyes, (aloof:1.2)',
+    '傲娇': 'tsundere, blushing, turned away, pouting',
+    '困倦': 'sleepy, half-closed eyes, yawning',
+    '疲惫': 'tired, exhausted, dark circles under eyes',
+    '兴奋': 'excited, sparkling eyes, (energetic:1.2)',
+    '激动': 'excited, (flushed:1.1), wide eyes',
+    '无聊': 'bored, blank stare, resting chin on hand',
+    '痛苦': 'pain, grimacing, furrowed brow, (agonized:1.2)',
+    '享受': 'pleasure, relaxed, half-closed eyes, (content:1.2)',
+    '得意': 'smug, smirk, confident, (proud:1.2)',
+    '尴尬': 'embarrassed, sweatdrop, awkward smile',
+    '无奈': 'sigh, resigned, sweatdrop, (wry smile:1.1)',
+    '困惑': 'confused, question mark, tilted head',
+    '感动': 'tears, touched, (moved:1.2), gentle smile',
+    '满足': 'content, relaxed, gentle smile, (satisfied:1.2)',
+};
+
+// Personality detection: Chinese keywords → expression/pose tendency
+const PERSONALITY_MAP = {
+    '害羞': 'tendency: blush, looking away, shy pose',
+    '内向': 'tendency: closed posture, looking down, quiet',
+    '冷静': 'tendency: poker face, composed, steady gaze',
+    '沉着': 'tendency: calm expression, confident stance',
+    '活泼': 'tendency: dynamic pose, bright smile, energetic',
+    '开朗': 'tendency: smile, open posture, cheerful',
+    '温柔': 'tendency: gentle smile, soft eyes, relaxed pose',
+    '善良': 'tendency: warm expression, gentle hands',
+    '冷漠': 'tendency: cold stare, crossed arms, distant',
+    '高傲': 'tendency: looking down, chin up, smug',
+    '傲娇': 'tendency: tsundere pose, turned away, blushing',
+    '认真': 'tendency: focused gaze, straight posture, serious',
+    '懒散': 'tendency: slouching, lazy eyes, relaxed pose',
+    '调皮': 'tendency: mischievous grin, playful pose',
+    '成熟': 'tendency: composed, elegant pose, slight smile',
+    '天真': 'tendency: innocent eyes, curious expression',
+    '强势': 'tendency: dominant pose, intense stare, confident',
+    '懦弱': 'tendency: cowering, hunched shoulders, nervous',
+    '腹黑': 'tendency: sly smile, half-closed eyes, scheming',
+};
+
+// Scene keywords for location/time detection
+const LOCATION_KEYWORDS = ['教室', '卧室', '客厅', '厨房', '浴室', '卫生间', '走廊', '楼梯', '阳台', '花园', '公园', '街道', '学校', '办公室', '图书馆', '咖啡厅', '餐厅', '医院', '海滩', '森林', '山顶', '河边', '床上', '桌上', '沙发上', '门口', '窗边', '镜前', '户外', '室内'];
+const TIME_KEYWORDS = ['早上', '上午', '中午', '下午', '傍晚', '黄昏', '晚上', '深夜', '凌晨', '白天', '日出', '日落', '半夜'];
+const STATE_KEYWORDS = ['站着', '坐着', '躺着', '跪着', '趴着', '蹲着', '靠着', '进门', '出门', '离开', '回来', '走过去', '转过身', '站起来', '坐下去'];
+
 // ═══════════════════════════════════════════════════════════
 // S2P Engine
 // ═══════════════════════════════════════════════════════════
@@ -238,7 +306,7 @@ class S2PEngine {
     }
 
     // ═══════════════════════════════════════════════
-    // Context Collection
+    // Context Collection (v2.5: smart context + emotion + personality + scene)
     // ═══════════════════════════════════════════════
 
     collectContext() {
@@ -252,6 +320,7 @@ class S2PEngine {
         const activeCharacters = new Map();
         const charNames = new Set();
 
+        // Phase 1: Collect character appearances
         for (const msg of msgs) {
             if (msg.is_user) continue;
             const name = msg.name || ctx.name2 || '角色';
@@ -290,36 +359,168 @@ class S2PEngine {
         }
 
         if (activeCharacters.size > 0) {
-            this._charCount = activeCharacters.size; // Store for post-processing
+            this._charCount = activeCharacters.size;
             const charList = [...activeCharacters.entries()].map(([n, d]) => `${n}: ${d}`).join('\n---\n');
             parts.push(`=== 以下角色外貌参考资料（共${activeCharacters.size}人——仅当聊天涉及性内容时才使用性器官描述，否则只用脸/发型/体型） ===`);
             parts.push(charList);
             parts.push('服装必须从聊天记录中提取，忽略角色设定中的默认服装');
+
+            // v2.5: Personality detection from character descriptions
+            const personalityInfo = this._extractPersonality(activeCharacters);
+            if (personalityInfo) {
+                parts.push('');
+                parts.push(personalityInfo);
+            }
+
             parts.push('=== 外貌参考结束 ===');
             parts.push(`★★★ 当前场景共有 ${activeCharacters.size} 个角色在画面中 ★★★
 如果人数≥2，第2行必须使用对应的复数标签（2girls/3girls/1boy1girl/couple等），禁止使用1girl/solo focus`);
         }
 
         if (chat?.length) {
+            // v2.5: Smart context selection — tiered message treatment
+            const totalMsgs = msgs.length;
+            const recentCount = Math.min(2, totalMsgs);
+            const nearCount = Math.min(4, Math.max(0, totalMsgs - recentCount));
+
             parts.push('');
             parts.push('=== 聊天记录 ===');
-            parts.push('时间顺序：越早越旧。只有最后2条是当前正在发生的动作。前面的只是环境背景——人物在哪里、穿着什么、有什么物品。不要把旧动作带入当前画面。');
-            for (let i = 0; i < msgs.length; i++) {
+
+            // v2.5: Scene change detection
+            const sceneInfo = this._detectSceneChange(msgs);
+            if (sceneInfo) parts.push(sceneInfo);
+
+            parts.push(`共${totalMsgs}条消息。最后${recentCount}条=当前正在发生；倒数${recentCount+1}-${recentCount+nearCount}条=近景参考；更早的=仅保留场景信息。`);
+
+            for (let i = 0; i < totalMsgs; i++) {
                 const msg = msgs[i];
-                const isRecent = i >= msgs.length - 2;
+                const posFromEnd = totalMsgs - i;
                 const sender = msg.is_user ? (ctx.name1 || '用户') : (msg.name || ctx.name2 || '角色');
-                let text = String(msg.mes || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().substring(0, 600);
+                let text = String(msg.mes || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
                 if (s.preprocess) text = this.preprocess(text);
                 const isGenPrompt = /\(masterpiece|\(best quality|\(semi-realistic|1girl|solo focus|\(POV/.test(text) && /nsfw|pussy|labia|nipples|penis/.test(text);
-                if (text && text.length > 5 && !isGenPrompt) {
-                    const marker = isRecent ? '当前' : '背景';
-                    parts.push(`[${marker}] ${sender}: ${text}`);
+                if (!text || text.length <= 5 || isGenPrompt) continue;
+
+                let marker;
+                if (posFromEnd <= recentCount) {
+                    marker = '当前';
+                } else if (posFromEnd <= recentCount + nearCount) {
+                    marker = '近景';
+                    text = text.substring(0, 400);
+                } else {
+                    marker = '背景';
+                    text = text.substring(0, 200);
                 }
+                parts.push(`[${marker}] ${sender}: ${text}`);
             }
-            parts.push('=== 当前=当前动作(优先) 背景=历史(只取地点/服装/物品，忽略已结束的动作) ===');
+
+            parts.push('=== 当前=当前动作(优先) 近景=近期参考 背景=仅取地点/服装/物品 ===');
+
+            // v2.5: Emotion detection from recent messages
+            const emotionInfo = this._detectEmotions(msgs, activeCharacters);
+            if (emotionInfo) {
+                parts.push('');
+                parts.push(emotionInfo);
+            }
+
             parts.push('警告：角色说的话里可能有大量比喻/拟人/夸张修辞（如"像小猫一样""如春风般""仿佛融化"），这些都是修辞手法，不是真实的画面内容。只提取字面意义上的物理动作和可见元素，忽略所有文学修辞。');
         }
         return parts.join('\n');
+    }
+
+    /**
+     * v2.5: Extract personality traits from character descriptions.
+     */
+    _extractPersonality(activeCharacters) {
+        const found = [];
+        for (const [name, desc] of activeCharacters) {
+            const traits = [];
+            for (const [keyword, tendency] of Object.entries(PERSONALITY_MAP)) {
+                if (desc.includes(keyword)) traits.push(tendency);
+            }
+            if (traits.length > 0) {
+                found.push(`${name}: ${traits.join('; ')}`);
+            }
+        }
+        if (found.length > 0) {
+            return '=== 角色性格参考（在生成第3行表情/姿势时参考） ===\n' + found.join('\n') + '\n=== 性格参考结束 ===';
+        }
+        return '';
+    }
+
+    /**
+     * v2.5: Detect current emotions from last few messages.
+     */
+    _detectEmotions(msgs, activeCharacters) {
+        const recentMsgs = msgs.slice(-4);
+        const charEmotions = new Map(); // name -> Set of tags
+
+        for (const msg of recentMsgs) {
+            if (msg.is_user) continue;
+            const name = msg.name || '';
+            if (!name || !activeCharacters.has(name)) continue;
+            if (!charEmotions.has(name)) charEmotions.set(name, new Set());
+
+            const text = msg.mes || '';
+            for (const [keyword, tags] of Object.entries(EMOTION_MAP)) {
+                if (text.includes(keyword)) {
+                    tags.split(', ').forEach(t => charEmotions.get(name).add(t));
+                }
+            }
+        }
+
+        if (charEmotions.size === 0) return '';
+
+        const lines = ['=== 当前情绪（在生成第3行姿势/表情时直接使用这些标签） ==='];
+        for (const [name, tags] of charEmotions) {
+            if (tags.size > 0) {
+                const tagList = [...tags].slice(0, 6).join(', ');
+                lines.push(`${name}: ${tagList}`);
+            }
+        }
+        lines.push('=== 情绪参考结束 ===');
+        return lines.length > 2 ? lines.join('\n') : '';
+    }
+
+    /**
+     * v2.5: Detect scene changes (location, time, state shifts).
+     */
+    _detectSceneChange(msgs) {
+        if (msgs.length < 4) return '';
+
+        const oldMsgs = msgs.slice(0, Math.floor(msgs.length / 2));
+        const newMsgs = msgs.slice(Math.floor(msgs.length / 2));
+
+        const findKeywords = (msgs, keywords) => {
+            const found = new Set();
+            for (const msg of msgs) {
+                for (const kw of keywords) {
+                    if ((msg.mes || '').includes(kw)) found.add(kw);
+                }
+            }
+            return [...found];
+        };
+
+        const oldLocations = findKeywords(oldMsgs, LOCATION_KEYWORDS);
+        const newLocations = findKeywords(newMsgs, LOCATION_KEYWORDS);
+        const newTimes = findKeywords(newMsgs, TIME_KEYWORDS);
+        const newStates = findKeywords(newMsgs, STATE_KEYWORDS);
+
+        const changedLocations = newLocations.filter(l => !oldLocations.includes(l));
+        if (changedLocations.length === 0 && newTimes.length === 0 && newStates.length === 0) return '';
+
+        let info = '=== 场景信息 ===\n';
+        if (changedLocations.length > 0) {
+            info += `当前地点: ${changedLocations.join('、')}（场景已切换，旧地点信息仅作历史参考）\n`;
+        }
+        if (newTimes.length > 0) {
+            info += `当前时间: ${newTimes.join('、')}\n`;
+        }
+        if (newStates.length > 0) {
+            info += `当前状态: ${newStates.join('、')}\n`;
+        }
+        info += '=== 场景信息结束 ===';
+        return info;
     }
 
     // ═══════════════════════════════════════════════

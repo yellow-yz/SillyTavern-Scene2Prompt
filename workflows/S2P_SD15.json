@@ -1,0 +1,69 @@
+{
+    "3": {
+        "class_type": "KSampler",
+        "inputs": {
+            "cfg": "%scale%",
+            "denoise": 1,
+            "latent_image": ["5", 0],
+            "model": ["4", 0],
+            "negative": ["7", 0],
+            "positive": ["6", 0],
+            "sampler_name": "%sampler%",
+            "scheduler": "%scheduler%",
+            "seed": "%seed%",
+            "steps": "%steps%"
+        },
+        "_meta": {"title": "采样 (SD1.5: DPM++ 2M Karras, CFG 7, 512x768)"}
+    },
+    "4": {
+        "class_type": "CheckpointLoaderSimple",
+        "inputs": {"ckpt_name": "%model%"},
+        "_meta": {"title": "加载模型"}
+    },
+    "5": {
+        "class_type": "EmptyLatentImage",
+        "inputs": {
+            "batch_size": 1,
+            "height": "%height%",
+            "width": "%width%"
+        },
+        "_meta": {"title": "画布尺寸 (SD1.5: 512x768 或 512x512)"}
+    },
+    "6": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+            "clip": ["4", 1],
+            "text": "%prompt%"
+        },
+        "_meta": {"title": "正向提示词"}
+    },
+    "7": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+            "clip": ["4", 1],
+            "text": "%negative_prompt%"
+        },
+        "_meta": {"title": "反向提示词"}
+    },
+    "8": {
+        "class_type": "VAEDecode",
+        "inputs": {
+            "samples": ["3", 0],
+            "vae": ["4", 2]
+        },
+        "_meta": {"title": "VAE解码 (anything-v5需外挂VAE)"}
+    },
+    "9": {
+        "class_type": "PreviewImage",
+        "inputs": {"images": ["8", 0]},
+        "_meta": {"title": "预览"}
+    },
+    "10": {
+        "class_type": "SaveImage",
+        "inputs": {
+            "filename_prefix": "S2P",
+            "images": ["8", 0]
+        },
+        "_meta": {"title": "保存图片"}
+    }
+}
