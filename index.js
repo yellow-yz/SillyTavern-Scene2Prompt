@@ -822,6 +822,7 @@ const MODEL_MATCH_RULES = [
     { pattern: /hassaku/i, profileId: 'hassaku_xl_v10' },
     { pattern: /pony/i, profileId: 'pony_diffusion_v6' },
     { pattern: /kohaku/i, profileId: 'kohaku_xl' },
+    { pattern: /nutella|fudge.?pie|apple.?pie|blueberry.?pie|cherry.?pie|derby.?pie|elderberry.?pie|grape.?pie|honey.?pie|impossible.?pie|jam.?pie|key.?lime.?pie|lemon.?pie|mango.?pie|pie.?models/i, profileId: 'nutella_pie' },
     { pattern: /illustrious/i, profileId: 'illustrious_xl_v10' },
     { pattern: /sdxl.*base|sd_xl.*base/i, profileId: 'sdxl_base_10' },
     { pattern: /anything.*v5|sd.?1\.?5|sd15/i, profileId: 'sd15_generic' },
