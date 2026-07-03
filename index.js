@@ -781,6 +781,13 @@ function applyModelParamsToST() {
     sd.width = width;
     sd.height = height;
 
+    // Also set the actual checkpoint model filename
+    if (isFilename && activeId) {
+        sd.model = activeId;
+        const modelSel = document.getElementById('sd_model');
+        if (modelSel) { modelSel.value = activeId; modelSel.dispatchEvent(new Event('change', {bubbles:true})); }
+    }
+
     saveSettingsDebounced();
 
     // Update all ST SD settings UI elements to reflect changes
@@ -798,6 +805,7 @@ function applyModelParamsToST() {
     setVal('sd_scheduler', sd.scheduler);
     setVal('sd_width', sd.width);
     setVal('sd_height', sd.height);
+    if (sd.model) setVal('sd_model', sd.model);
 
     log(`已同步到 ST: ${profile.name} → ${sd.comfy_workflow} | ${sd.width}×${sd.height} | Steps:${sd.steps} | CFG:${sd.scale} | ${sd.sampler}`, 'info');
     if (typeof toastr !== 'undefined') toastr.success('参数已同步: ' + profile.name, 'Scene2Prompt');
