@@ -835,9 +835,9 @@ async function fetchComfyModels() {
         });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const data = await resp.json();
-        // ST returns either string[] or {name, type}[]
+        // ST returns [{value, text}, ...] from ComfyUI object_info
         let list = Array.isArray(data) ? data : (data.checkpoints || data.models || []);
-        list = list.map(item => typeof item === 'string' ? item : (item.name || item.filename || item.file || String(item)));
+        list = list.map(item => typeof item === 'string' ? item : (item.value || item.name || item.filename || String(item)));
         return list;
     } catch (e) {
         log('获取 ComfyUI 模型列表失败: ' + e.message, 'error');
