@@ -1,8 +1,9 @@
 {
     "display_name": "Scene2Prompt - 场景画面生成增强",
-    "version": "2.0.0",
+    "version": "2.4.0",
     "description": "将聊天上下文发送给 LLM 增强为 Danbooru 标签，再交给 ComfyUI 生成更精准的画面。支持 DeepSeek / OpenAI / OpenRouter / Ollama / 自定义 Provider。",
-    "author": "S2P Community",
+    "author": "yellow-yz",
+    "homePage": "https://github.com/yellow-yz/SillyTavern-Scene2Prompt",
     "js": "index.js",
     "css": "style.css",
     "loading_order": 100,
