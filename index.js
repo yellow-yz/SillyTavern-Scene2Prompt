@@ -409,6 +409,7 @@ function bindSettingsEvents() {
         saveSettingsDebounced();
         updateModelProfileUI();
         updateSettingsUI();
+        applyModelParamsToST();
         if (modelProfileManager) {
             const p = modelProfileManager.get(this.value);
             if (p) log('已切换模型: ' + p.name + ' (' + p.baseModel + ' · ' + p.promptFormat + ') Steps:' + p.recommendedSteps + ' CFG:' + p.recommendedCfg, 'info');
@@ -419,6 +420,8 @@ function bindSettingsEvents() {
         const name = prompt('模型配置名称：');
         if (name) { modelProfileManager.save(name); updateModelProfileUI(); log('模型配置已保存: ' + name, 'info'); }
     });
+    bind('s2p_apply_to_st', 'click', () => applyModelParamsToST());
+
     bind('s2p_profile_delete', 'click', () => {
         if (!modelProfileManager) return;
         const id = getSettings().modelProfiles?.activeProfileId;
@@ -672,6 +675,50 @@ function updateModelProfileUI() {
             warnEl.style.display = 'none';
         }
     }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Apply model params to SillyTavern's SD extension
+// ═══════════════════════════════════════════════════════════
+
+function applyModelParamsToST() {
+    if (!modelProfileManager || !extension_settings.sd) return;
+    const profile = modelProfileManager.getActive();
+    if (!profile) return;
+
+    const sd = extension_settings.sd;
+
+    // Map model to workflow
+    if (profile.workflowFile) {
+        sd.comfy_workflow = profile.workflowFile;
+    } else if (profile.vPred) {
+        sd.comfy_workflow = 'S2P_SDXL_vpred.json';
+    } else {
+        sd.comfy_workflow = 'S2P_SDXL_eps.json';
+    }
+
+    // Apply recommended params
+    sd.steps = profile.recommendedSteps;
+    sd.cfg_scale = profile.recommendedCfg;
+    sd.sampler = profile.recommendedSampler;
+    sd.scheduler = profile.recommendedScheduler || 'normal';
+    sd.width = profile.recommendedSize?.width || 1024;
+    sd.height = profile.recommendedSize?.height || 1024;
+
+    saveSettingsDebounced();
+
+    // Update ST's SD settings UI if visible
+    const wfSel = document.getElementById('sd_comfy_workflow');
+    if (wfSel) wfSel.value = sd.comfy_workflow;
+    const stepsSel = document.getElementById('sd_steps');
+    if (stepsSel) { stepsSel.value = sd.steps; stepsSel.dispatchEvent(new Event('input', {bubbles:true})); }
+    const wInput = document.getElementById('sd_width');
+    if (wInput) { wInput.value = sd.width; wInput.dispatchEvent(new Event('input', {bubbles:true})); }
+    const hInput = document.getElementById('sd_height');
+    if (hInput) { hInput.value = sd.height; hInput.dispatchEvent(new Event('input', {bubbles:true})); }
+
+    log(`已应用模型参数到 ST: ${profile.name} → ${sd.comfy_workflow}, ${sd.width}×${sd.height}, Steps:${sd.steps}, CFG:${sd.cfg_scale}`, 'info');
+    if (typeof toastr !== 'undefined') toastr.success('参数已同步: ' + profile.name, 'Scene2Prompt');
 }
 
 // ═══════════════════════════════════════════════════════════

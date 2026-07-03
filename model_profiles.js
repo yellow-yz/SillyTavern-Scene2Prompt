@@ -26,8 +26,8 @@ const BUILT_IN_PROFILES = [
         recommendedSteps: 30, recommendedCfg: 5, recommendedSampler: 'euler_ancestral', recommendedScheduler: 'normal',
         recommendedSize: { width: 896, height: 1152 }, clipSkip: 2,
         vPred: false, tagLimit: 120,
-        warning: null,
-        specialTagSystem: null,
+        workflowFile: 'S2P_SDXL_eps.json',
+        warning: null, specialTagSystem: null,
     },
     {
         id: 'noobai_xl_v10',
@@ -42,6 +42,7 @@ const BUILT_IN_PROFILES = [
         recommendedSteps: 28, recommendedCfg: 4.5, recommendedSampler: 'euler', recommendedScheduler: 'normal',
         recommendedSize: { width: 1024, height: 1024 }, clipSkip: 2,
         vPred: true, tagLimit: 100,
+        workflowFile: 'S2P_SDXL_vpred.json',
         warning: 'NoobAI 是 v-prediction 模型！禁用 Karras 系列采样器（DPM++ 2M Karras 等），CFG 控制在 4-5，超过 6 会炸图。',
         specialTagSystem: null,
     },
