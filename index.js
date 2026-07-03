@@ -697,9 +697,9 @@ function applyModelParamsToST() {
         sd.comfy_workflow = 'S2P_SDXL_eps.json';
     }
 
-    // Apply recommended params
+    // Apply recommended params (matching ST's exact field names)
     sd.steps = profile.recommendedSteps;
-    sd.cfg_scale = profile.recommendedCfg;
+    sd.scale = profile.recommendedCfg;
     sd.sampler = profile.recommendedSampler;
     sd.scheduler = profile.recommendedScheduler || 'normal';
     sd.width = profile.recommendedSize?.width || 1024;
@@ -707,17 +707,23 @@ function applyModelParamsToST() {
 
     saveSettingsDebounced();
 
-    // Update ST's SD settings UI if visible
-    const wfSel = document.getElementById('sd_comfy_workflow');
-    if (wfSel) wfSel.value = sd.comfy_workflow;
-    const stepsSel = document.getElementById('sd_steps');
-    if (stepsSel) { stepsSel.value = sd.steps; stepsSel.dispatchEvent(new Event('input', {bubbles:true})); }
-    const wInput = document.getElementById('sd_width');
-    if (wInput) { wInput.value = sd.width; wInput.dispatchEvent(new Event('input', {bubbles:true})); }
-    const hInput = document.getElementById('sd_height');
-    if (hInput) { hInput.value = sd.height; hInput.dispatchEvent(new Event('input', {bubbles:true})); }
+    // Update all ST SD settings UI elements to reflect changes
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.value = val;
+        el.dispatchEvent(new Event('input', {bubbles: true}));
+        el.dispatchEvent(new Event('change', {bubbles: true}));
+    };
+    setVal('sd_comfy_workflow', sd.comfy_workflow);
+    setVal('sd_steps', sd.steps);
+    setVal('sd_scale', sd.scale);
+    setVal('sd_sampler', sd.sampler);
+    setVal('sd_scheduler', sd.scheduler);
+    setVal('sd_width', sd.width);
+    setVal('sd_height', sd.height);
 
-    log(`已应用模型参数到 ST: ${profile.name} → ${sd.comfy_workflow}, ${sd.width}×${sd.height}, Steps:${sd.steps}, CFG:${sd.cfg_scale}`, 'info');
+    log(`已同步到 ST: ${profile.name} → ${sd.comfy_workflow} | ${sd.width}×${sd.height} | Steps:${sd.steps} | CFG:${sd.scale} | ${sd.sampler}`, 'info');
     if (typeof toastr !== 'undefined') toastr.success('参数已同步: ' + profile.name, 'Scene2Prompt');
 }
 
