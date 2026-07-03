@@ -402,17 +402,36 @@ function bindSettingsEvents() {
     bind('s2p_model_profile', 'change', function() {
         const s = getSettings();
         if (!s.modelProfiles) s.modelProfiles = {};
-        s.modelProfiles.activeProfileId = this.value;
-        // Sync style to match model profile
+
+        // Check if this is a detected model filename or a profile ID
+        const isFilename = /\.(safetensors|ckpt|pt)$/i.test(this.value);
+        let profileId = this.value;
+        let profile;
+
+        if (isFilename) {
+            // Try to match to built-in profile
+            const matchedId = matchModelProfile(this.value);
+            profileId = matchedId || this.value;
+            s.modelProfiles.activeProfileId = profileId;
+            profile = matchedId ? modelProfileManager.get(profileId) : null;
+        } else {
+            s.modelProfiles.activeProfileId = this.value;
+            profile = modelProfileManager.get(this.value);
+        }
+
+        // Sync style
         const styleMap = { wai_illustrious_v140:'WAI', animagine_xl_v31:'Animagine', noobai_xl_v10:'Animagine', pony_diffusion_v6:'Animagine', illustrious_xl_v10:'Animagine', hassaku_xl_v10:'Animagine', sdxl_base_10:'写实' };
-        if (styleMap[this.value]) s.style = styleMap[this.value];
+        if (styleMap[profileId]) s.style = styleMap[profileId];
+
         saveSettingsDebounced();
         updateModelProfileUI();
         updateSettingsUI();
         applyModelParamsToST();
-        if (modelProfileManager) {
-            const p = modelProfileManager.get(this.value);
-            if (p) log('已切换模型: ' + p.name + ' (' + p.baseModel + ' · ' + p.promptFormat + ') Steps:' + p.recommendedSteps + ' CFG:' + p.recommendedCfg, 'info');
+
+        if (profile) {
+            log('已切换模型: ' + profile.name + ' (' + profile.baseModel + ' · ' + profile.promptFormat + ') Steps:' + profile.recommendedSteps + ' CFG:' + profile.recommendedCfg, 'info');
+        } else if (isFilename) {
+            log('已切换模型: ' + this.value + ' (通用SDXL配置)', 'info');
         }
     });
     bind('s2p_profile_save', 'click', () => {
@@ -420,6 +439,7 @@ function bindSettingsEvents() {
         const name = prompt('模型配置名称：');
         if (name) { modelProfileManager.save(name); updateModelProfileUI(); log('模型配置已保存: ' + name, 'info'); }
     });
+    bind('s2p_refresh_models', 'click', () => refreshModelList());
     bind('s2p_apply_to_st', 'click', () => applyModelParamsToST());
 
     bind('s2p_profile_delete', 'click', () => {
@@ -642,16 +662,50 @@ function updateModelProfileUI() {
 
     const s = getSettings();
     if (!s.modelProfiles) s.modelProfiles = { activeProfileId: 'noobai_xl_v10' };
-    const profiles = modelProfileManager.getAll();
     const activeId = s.modelProfiles.activeProfileId;
 
     sel.innerHTML = '';
-    for (const p of profiles) {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.builtIn ? `${p.name} [内置]` : p.name;
-        if (p.id === activeId) opt.selected = true;
-        sel.appendChild(opt);
+
+    // If we have detected models from ComfyUI, show them prefixed with "我的:"
+    const detectedModels = s.detectedModels || [];
+    if (detectedModels.length > 0) {
+        // Group: built-in profiles that match detected models
+        const matched = new Set();
+        for (const filename of detectedModels) {
+            const pid = matchModelProfile(filename);
+            if (pid) matched.add(pid);
+        }
+
+        // Show detected model filenames as options
+        sel.appendChild(new Option('── 我的模型 ──', '', true, true));
+        for (const filename of detectedModels) {
+            const pid = matchModelProfile(filename);
+            const profile = pid ? modelProfileManager.get(pid) : null;
+            const label = profile ? `${filename} → ${profile.name}` : filename + ' (通用SDXL)';
+            const opt = new Option(label, filename);
+            if (filename === activeId) opt.selected = true;
+            sel.appendChild(opt);
+        }
+
+        sel.appendChild(new Option('── 内置配置 ──', '', true, true));
+        const profiles = modelProfileManager.getAll();
+        for (const p of profiles) {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.builtIn ? `${p.name} [内置]` : p.name;
+            if (p.id === activeId && !detectedModels.includes(activeId)) opt.selected = true;
+            sel.appendChild(opt);
+        }
+    } else {
+        // Fallback: show built-in profiles only
+        const profiles = modelProfileManager.getAll();
+        for (const p of profiles) {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.builtIn ? `${p.name} [内置]` : p.name;
+            if (p.id === activeId) opt.selected = true;
+            sel.appendChild(opt);
+        }
     }
 
     const profile = modelProfileManager.get(activeId);
@@ -683,27 +737,49 @@ function updateModelProfileUI() {
 
 function applyModelParamsToST() {
     if (!modelProfileManager || !extension_settings.sd) return;
-    const profile = modelProfileManager.getActive();
-    if (!profile) return;
+    const s = getSettings();
+    const activeId = s.modelProfiles?.activeProfileId;
 
+    // Check if it's a detected filename
+    const isFilename = /\.(safetensors|ckpt|pt)$/i.test(activeId || '');
+    let profile = modelProfileManager.getActive();
     const sd = extension_settings.sd;
 
-    // Map model to workflow
-    if (profile.workflowFile) {
-        sd.comfy_workflow = profile.workflowFile;
-    } else if (profile.vPred) {
-        sd.comfy_workflow = 'S2P_SDXL_vpred.json';
+    // Determine workflow and params
+    let workflow, steps, cfg, sampler, scheduler, width, height;
+    if (profile && !isFilename) {
+        // Known profile
+        workflow = profile.workflowFile || (profile.vPred ? 'S2P_SDXL_vpred.json' : 'S2P_SDXL_eps.json');
+        steps = profile.recommendedSteps;
+        cfg = profile.recommendedCfg;
+        sampler = profile.recommendedSampler;
+        scheduler = profile.recommendedScheduler || 'normal';
+        width = profile.recommendedSize?.width || 1024;
+        height = profile.recommendedSize?.height || 1024;
+    } else if (isFilename) {
+        // Detected model — auto-detect type
+        const fn = (activeId || '').toLowerCase();
+        if (/noobai|vpred|v_pred|v-pred/i.test(fn)) {
+            workflow = 'S2P_SDXL_vpred.json'; steps = 28; cfg = 4; sampler = 'euler'; scheduler = 'simple';
+        } else if (/anything.*v5|sd.?1\.?5|sd15/i.test(fn)) {
+            workflow = 'S2P_SD15.json'; steps = 20; cfg = 7; sampler = 'dpmpp_2m'; scheduler = 'karras';
+        } else {
+            workflow = 'S2P_SDXL_eps.json'; steps = 28; cfg = 6; sampler = 'euler_ancestral'; scheduler = 'normal';
+        }
+        width = 1024; height = 1024;
     } else {
-        sd.comfy_workflow = 'S2P_SDXL_eps.json';
+        // Fallback
+        workflow = 'S2P_SDXL_eps.json'; steps = 28; cfg = 6; sampler = 'euler_ancestral'; scheduler = 'normal';
+        width = 1024; height = 1024;
     }
 
-    // Apply recommended params (matching ST's exact field names)
-    sd.steps = profile.recommendedSteps;
-    sd.scale = profile.recommendedCfg;
-    sd.sampler = profile.recommendedSampler;
-    sd.scheduler = profile.recommendedScheduler || 'normal';
-    sd.width = profile.recommendedSize?.width || 1024;
-    sd.height = profile.recommendedSize?.height || 1024;
+    sd.comfy_workflow = workflow;
+    sd.steps = steps;
+    sd.scale = cfg;
+    sd.sampler = sampler;
+    sd.scheduler = scheduler;
+    sd.width = width;
+    sd.height = height;
 
     saveSettingsDebounced();
 
@@ -725,6 +801,72 @@ function applyModelParamsToST() {
 
     log(`已同步到 ST: ${profile.name} → ${sd.comfy_workflow} | ${sd.width}×${sd.height} | Steps:${sd.steps} | CFG:${sd.scale} | ${sd.sampler}`, 'info');
     if (typeof toastr !== 'undefined') toastr.success('参数已同步: ' + profile.name, 'Scene2Prompt');
+}
+
+// ═══════════════════════════════════════════════════════════
+// Fetch & match ComfyUI models
+// ═══════════════════════════════════════════════════════════
+
+const MODEL_MATCH_RULES = [
+    { pattern: /noobai|nai-xl|vpred|v_pred|v-pred/i, profileId: 'noobai_xl_v10' },
+    { pattern: /wai.*illustrious|wai.*nsfw/i, profileId: 'wai_illustrious_v140' },
+    { pattern: /animagine/i, profileId: 'animagine_xl_v31' },
+    { pattern: /hassaku/i, profileId: 'hassaku_xl_v10' },
+    { pattern: /pony/i, profileId: 'pony_diffusion_v6' },
+    { pattern: /kohaku/i, profileId: 'kohaku_xl' },
+    { pattern: /illustrious/i, profileId: 'illustrious_xl_v10' },
+    { pattern: /sdxl.*base|sd_xl.*base/i, profileId: 'sdxl_base_10' },
+    { pattern: /anything.*v5|sd.?1\.?5|sd15/i, profileId: 'sd15_generic' },
+];
+
+async function fetchComfyModels() {
+    const sd = extension_settings.sd;
+    if (!sd?.comfy_url) {
+        log('未配置 ComfyUI URL，请在 ST 的 SD 设置中配置', 'error');
+        if (typeof toastr !== 'undefined') toastr.warning('请先在 ST 的 SD 设置中配置 ComfyUI URL', 'Scene2Prompt');
+        return [];
+    }
+
+    try {
+        const resp = await fetch('/api/sd/comfy/models', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify({ url: sd.comfy_url }),
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        return Array.isArray(data) ? data : (data.checkpoints || data.models || []);
+    } catch (e) {
+        log('获取 ComfyUI 模型列表失败: ' + e.message, 'error');
+        return [];
+    }
+}
+
+function matchModelProfile(filename) {
+    for (const rule of MODEL_MATCH_RULES) {
+        if (rule.pattern.test(filename)) {
+            return rule.profileId;
+        }
+    }
+    return null; // No match → will be auto-generated
+}
+
+async function refreshModelList() {
+    const btn = document.getElementById('s2p_refresh_models');
+    if (btn) { btn.disabled = true; btn.textContent = '加载中...'; }
+
+    const models = await fetchComfyModels();
+    const s = getSettings();
+    if (!s.detectedModels) s.detectedModels = [];
+    s.detectedModels = models;
+    saveSettingsDebounced();
+
+    // Update model profile dropdown
+    updateModelProfileUI();
+    log(`检测到 ${models.length} 个 ComfyUI 模型`, 'info');
+    if (typeof toastr !== 'undefined') toastr.success(`检测到 ${models.length} 个模型`, 'Scene2Prompt');
+
+    if (btn) { btn.disabled = false; btn.textContent = '刷新模型列表'; }
 }
 
 // ═══════════════════════════════════════════════════════════
