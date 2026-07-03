@@ -36,15 +36,15 @@ const BUILT_IN_PROFILES = [
         description: '通用动漫，全场景兼容',
         builtIn: true,
         promptFormat: 'danbooru',
-        qualityPrefix: 'masterpiece, best quality, newest, absurdres, highres',
-        negativePrefix: 'nsfw, worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands, sketch, jpeg artifacts, scan artifacts',
-        styleNotes: '日系动画风格。提示词简短即可，让模型主导生成。禁止: photorealistic, raw photo, 3d render, realistic skin',
-        recommendedSteps: 28, recommendedCfg: 4.5, recommendedSampler: 'euler', recommendedScheduler: 'normal',
+        qualityPrefix: 'masterpiece, best quality, very aesthetic, newest, absurdres, highres',
+        negativePrefix: 'worst quality, low quality, normal quality, old, early, lowres, sketch, jpeg artifacts, text, signature, watermark, artist name, copyright name, bad hands, mutated hands, blurry, (censor:1.3)',
+        styleNotes: '日系动漫风格。可使用风格触发器: illust style(数字插画) / anime style(赛璐珞动画) / manga style(黑白漫画) / simple illust style(扁平风格)。禁止: photorealistic, realistic, 3d render。',
+        recommendedSteps: 28, recommendedCfg: 4, recommendedSampler: 'euler', recommendedScheduler: 'simple',
         recommendedSize: { width: 1024, height: 1024 }, clipSkip: 2,
         vPred: true, tagLimit: 100,
         workflowFile: 'S2P_SDXL_vpred.json',
-        warning: 'NoobAI 是 v-prediction 模型！禁用 Karras 系列采样器（DPM++ 2M Karras 等），CFG 控制在 4-5，超过 6 会炸图。',
-        specialTagSystem: null,
+        warning: 'NoobAI 是 v-prediction 模型！采样器必须用 Euler+Simple，CFG 3-5，禁用 Karras! 品质标签放在提示词末尾效果更好。',
+        specialTagSystem: 'noobai',
     },
     {
         id: 'animagine_xl_v31',
@@ -157,7 +157,9 @@ function buildDanbooruPrompt(profile) {
         extraRules = '\n## Pony 标签体系\n必须使用 score_9, score_8_up... 评分链作为品质标签。支持 source_anime/source_furry/source_pony 选择风格和 rating_safe/rating_explicit 控制分级。';
     }
 
-    if (profile.vPred) {
+    if (profile.specialTagSystem === 'noobai') {
+        extraRules = '\n## NoobAI v-pred 标签体系\n★★★ 品质标签必须放在第6行末尾（所有内容标签之后），格式: [内容标签], masterpiece, best quality, very aesthetic, newest, absurdres。第1行不要放品质标签，改为放风格触发器: illust style / anime style / manga style 等。';
+    } else if (profile.vPred) {
         extraRules += '\n## v-prediction 注意事项\n此模型为 v-prediction，不适用常规 Karras 风格提示。标签保持简洁，让模型自身风格主导。';
     }
 
@@ -170,7 +172,7 @@ function buildDanbooruPrompt(profile) {
 [POSITIVE]
 6行Danbooru标签
 
-第1行 — 品质+风格(<=8): ${qualityLine}
+第1行 — ${profile.specialTagSystem === 'noobai' ? '风格触发器(<=4): 选illust style/anime style/manga style等。★★★ 品质标签放第6行末尾！★★★' : `品质+风格(<=8): ${qualityLine}`}
 
 第2行 — 主体(<=4): 标准人数标签
   单人: 1girl+female 或 solo focus+POV+first person view
@@ -206,7 +208,7 @@ function buildDanbooruPrompt(profile) {
 第5行 — 身体+发型(<=30): 多人按角色分写: name1: hair/eyes/build; name2: hair/eyes/build。禁止混淆特征
   （性器官/体液标签规则见底部「内容级别」说明）
 
-第6行 — 场景+光线+视角+构图(<=8): 根据人数和场景选镜头:
+第6行 — ${profile.specialTagSystem === 'noobai' ? '场景+光线+构图(<=4) + ★品质标签★(<=4,末尾): ' + profile.qualityPrefix + '。然后根据人数选镜头:' : '场景+光线+视角+构图(<=8): 根据人数和场景选镜头:'}
   单人: 自由构图
   2人互动: medium shot / from side / cowboy shot（对话不用 close-up，看不清两人关系）
   3人: wide shot / from front
