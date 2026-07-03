@@ -5,7 +5,7 @@
             "cfg": 4,
             "denoise": 1,
             "latent_image": ["5", 0],
-            "model": ["11", 0],
+            "model": ["4", 0],
             "negative": ["7", 0],
             "positive": ["6", 0],
             "sampler_name": "euler",
@@ -13,75 +13,36 @@
             "seed": "%seed%",
             "steps": 28
         },
-        "_meta": {"title": "第一阶段采样 (v-pred: Euler+Simple, CFG=4)"}
+        "_meta": {"title": "NoobAI v-pred: Euler+Simple, CFG=4"}
     },
     "4": {
         "class_type": "CheckpointLoaderSimple",
-        "inputs": {"ckpt_name": "%model%"},
-        "_meta": {"title": "加载模型"}
+        "inputs": {"ckpt_name": "%model%"}
     },
     "5": {
         "class_type": "EmptyLatentImage",
-        "inputs": {
-            "batch_size": 1,
-            "height": "%height%",
-            "width": "%width%"
-        },
-        "_meta": {"title": "画布尺寸"}
+        "inputs": {"batch_size": 1, "height": "%height%", "width": "%width%"}
     },
     "6": {
         "class_type": "CLIPTextEncode",
-        "inputs": {
-            "clip": ["4", 1],
-            "text": "%prompt%"
-        },
+        "inputs": {"clip": ["4", 1], "text": "%prompt%"},
         "_meta": {"title": "正向提示词"}
     },
     "7": {
         "class_type": "CLIPTextEncode",
-        "inputs": {
-            "clip": ["4", 1],
-            "text": "%negative_prompt%"
-        },
+        "inputs": {"clip": ["4", 1], "text": "%negative_prompt%"},
         "_meta": {"title": "反向提示词"}
     },
     "8": {
         "class_type": "VAEDecode",
-        "inputs": {
-            "samples": ["3", 0],
-            "vae": ["4", 2]
-        },
-        "_meta": {"title": "VAE解码"}
+        "inputs": {"samples": ["3", 0], "vae": ["4", 2]}
     },
     "9": {
         "class_type": "PreviewImage",
-        "inputs": {"images": ["8", 0]},
-        "_meta": {"title": "预览"}
+        "inputs": {"images": ["8", 0]}
     },
     "10": {
         "class_type": "SaveImage",
-        "inputs": {
-            "filename_prefix": "S2P",
-            "images": ["8", 0]
-        },
-        "_meta": {"title": "保存图片"}
-    },
-    "11": {
-        "class_type": "DynamicThresholdingFull",
-        "inputs": {
-            "model": ["4", 0],
-            "mimic_scale": 7,
-            "threshold_percentile": 1,
-            "mimic_mode": "Half Cosine Down",
-            "mimic_scale_min": 1,
-            "cfg_mode": "Half Cosine Down",
-            "cfg_scale_min": 3,
-            "sched_val": 1,
-            "separate_feature_channels": "enable",
-            "scaling_startpoint": "ZERO",
-            "variability_measure": "STD",
-            "interpolate_phi": 1
-        },
-        "_meta": {"title": "v-pred CFG修正 (防止过饱和)"}
+        "inputs": {"filename_prefix": "S2P", "images": ["8", 0]}
     }
 }
