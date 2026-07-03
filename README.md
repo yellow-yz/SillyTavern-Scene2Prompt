@@ -30,6 +30,8 @@
 SillyTavern/data/default-user/extensions/scene2prompt/
 ```
 
+> ⚠️ **目录名必须是 `scene2prompt`**（全小写）。不要用 GitHub 默认克隆名 `SillyTavern-Scene2Prompt`，否则会 404 报错。
+
 刷新 ST。
 
 ### 导入工作流
@@ -82,7 +84,7 @@ SillyTavern/data/default-user/extensions/scene2prompt/
 | 画面异常 | 工作流选对了吗？v-pred 模型用 `S2P_SDXL_vpred.json` |
 | 多人特征混合 | 换 Animagine XL 或 Hassaku XL |
 | SFW 出裸体 | 内容门控改"无"，模型用 Animagine |
-| 刷新列表失败 | ST 的 ComfyUI URL 配了吗 |
+| 404 Not Found (settings.html) | 目录名必须为 `scene2prompt`，不能是 `SillyTavern-Scene2Prompt` |
 
 ## 许可
 
@@ -108,7 +110,7 @@ AGPL-3.0
 
 ## Quick Start
 
-1. Copy to `SillyTavern/data/default-user/extensions/scene2prompt/`
+1. Copy to `SillyTavern/data/default-user/extensions/scene2prompt/` (⚠️ folder MUST be named `scene2prompt`)
 2. Copy workflows to `data/default-user/user/workflows/`
 3. Restart ST
 4. Configure ComfyUI URL in ST's Image Generation settings
