@@ -26,8 +26,8 @@ const DEFAULT_SYSTEM_PROMPT = `你是SD提示词专家。根据风格参数使�
 [NEGATIVE]
 反向提示词
 
-## 内容级别（最先判断）
-根据参数「内容」: 无=完全SFW，禁止任何性标签，跳过下文NSFW速查 / 软色情=可裸露无性行为 / 显式=全部可含 / 自动=自行判断
+## 内容级别
+本插件仅生成全年龄（SFW）内容。所有行均禁止任何性相关标签。
 
 ## 6行格式
 第1行 — 品质+风格:
@@ -36,7 +36,7 @@ const DEFAULT_SYSTEM_PROMPT = `你是SD提示词专家。根据风格参数使�
 
 第2行 — 主体: 输出正确的人数标签。单人: 1girl+female 或 solo focus+POV; 多人: 2girls/3girls/1boy2girls等标准标签，多人POV加POV+first person view——不要solo focus。(禁止不在场角色)
 
-第3行: 姿势+表情(<=25标签)。多人时每人写不同的姿势来天然分离——一人跪着一人站着、一人低头一人仰头等。格式: (name1: distinct_pose1, expr:1.1), (name2: distinct_pose2, expr:1.1)。内容≠无且涉及性时才加性标签
+第3行: 姿势+表情(<=25标签)。多人时每人写不同的姿势来天然分离——一人跪着一人站着、一人低头一人仰头等。格式: (name1: distinct_pose1, expr:1.1), (name2: distinct_pose2, expr:1.1)
 第4行: 服装(以聊天记录为准，多人时按角色分写: name1: clothing1; name2: clothing2)
 第5行: 身体+发型(<=30标签，多人时按角色分写: name1: hair/eyes/skin/build; name2: hair/eyes/skin/build。禁止性器官/液体)
 第6行: 场景+光线+视角+构图(<=8标签)。根据场景自己选最佳构图——from front/from above/from side/wide shot/POV/close-up等。多人与POV是否冲突由你根据上文POV判断标准决定
@@ -50,20 +50,15 @@ const DEFAULT_SYSTEM_PROMPT = `你是SD提示词专家。根据风格参数使�
 ## 反向提示词
 lowres, (bad quality:1.2), (worst quality:1.2), bad anatomy, sketch, jpeg artifacts, ugly, poorly drawn, blurry, watermark, extra digits, anime style, anime coloring, cel shading, 3d render, photorealistic, raw photo, cartoon, plastic skin, airbrushed, doll-like, signature, text
 
-## NSFW速查（仅内容≠无时参考）
-体位: 传教士(missionary)/后入(doggystyle)/骑乘(cowgirl)/口交(fellatio+blowjob)/舔阴(cunnilingus)/侧入(spoon)/自慰(masturbation+fingering)/中出(creampie)。权重1.3。一个场景一个体位。
-器官(pussy/labia/clitoris/nipples/penis/glans)权重1.3，体液(pussy juice/semen/cum/saliva)权重1.2。
 ## POV模式(当参数POV=自行判断时，你根据场景自己决定)
-- 用POV: 镜头是观看者的眼睛，对方的动作对着你做(口交/舔阴/对面说话)、观看者的手/腿/阴茎自然入镜
+- 用POV: 镜头是观看者的眼睛，对方的动作对着你做(对面说话/递东西)、观看者的手自然入镜
 - 不用POV: 观看者也该被画面看到(围桌吃饭/三人合照/并肩躺着)，用客观视角(wide shot/from side)
-- 人数不是判断标准——两人跪你面前口交用POV合理，三人围桌吃饭用客观合理
 - POV时禁止1boy/male/couple标签
 
 输出: [POSITIVE]...[NEGATIVE]...
 `;
 
-// Anti-censor tags (only applied when content level = 显式 or 软色情)
-const ANTI_CENSOR_TAGS = '(censored:1.9), (mosaic:1.9), (white censor bar:1.9), white bar, (white line:1.8), (white glow:1.8), (light beam:1.8), (light bar:1.8), (nipple censor:1.7), (genital mosaic:1.9), (steam censor:1.6), (pixelation:1.9), (censor bar:1.9), censored';
+// Content is strictly SFW — no anti-censor tags needed
 
 // Emotion detection: Chinese keywords → Danbooru expression tags
 const EMOTION_MAP = {
@@ -361,7 +356,7 @@ class S2PEngine {
         if (activeCharacters.size > 0) {
             this._charCount = activeCharacters.size;
             const charList = [...activeCharacters.entries()].map(([n, d]) => `${n}: ${d}`).join('\n---\n');
-            parts.push(`=== 以下角色外貌参考资料（共${activeCharacters.size}人——仅当聊天涉及性内容时才使用性器官描述，否则只用脸/发型/体型） ===`);
+            parts.push(`=== 以下角色外貌参考资料（共${activeCharacters.size}人——仅使用脸/发型/体型等外貌特征） ===`);
             parts.push(charList);
             parts.push('服装必须从聊天记录中提取，忽略角色设定中的默认服装');
 
@@ -640,15 +635,14 @@ ${sceneText}
             tags.push('(1girl:1.4), female');
         }
 
-        const sfwMap = {
+        const bodyMap = {
             '长发': 'long hair', '短发': 'short hair', '双马尾': 'twintails', '马尾': 'ponytail',
             '盘发': 'hair bun', '卷发': 'wavy hair', '刘海': 'bangs', '白发': 'white hair', '金发': 'blonde hair',
             '蓝眼': 'blue eyes', '绿眼': 'green eyes', '红眼': 'red eyes', '雀斑': 'freckles', '眼镜': 'glasses',
-            '苗条': 'slim', '纤细': 'slender', '丰满': 'curvy', '白皙': 'pale skin',
-            '大胸': 'large breasts', '平胸': 'flat chest', '细腰': 'narrow waist', '宽臀': 'wide hips', '长腿': 'long legs',
+            '苗条': 'slim', '纤细': 'slender', '白皙': 'pale skin',
             '校服': 'school uniform', '衬衫': 'white blouse', '毛衣': 'sweater', '裙子': 'skirt',
             '丝袜': 'pantyhose', '黑丝': 'black stockings', '过膝袜': 'thighhighs', '高跟鞋': 'high heels',
-            '睡衣': 'sleepwear', '浴巾': 'towel',
+            '睡衣': 'sleepwear',
             '脸红': 'blush', '微笑': 'smile', '害羞': 'embarrassed', '哭泣': 'tears', '闭眼': 'closed eyes',
             '躺着': 'lying on back', '坐着': 'sitting', '站着': 'standing', '跪着': 'kneeling', '趴着': 'on all fours',
             '教室': 'classroom', '卧室': 'bedroom', '浴室': 'bathroom', '客厅': 'living room', '厨房': 'kitchen',
@@ -656,23 +650,8 @@ ${sceneText}
             '白天': 'daylight', '夜晚': 'night', '黄昏': 'sunset', '月光': 'moonlight', '烛光': 'candlelight', '昏暗': 'dim lighting',
         };
 
-        const nsfwMap = {
-            '巨乳': '(huge breasts:1.3)', '内衣': 'lingerie', '裸体': 'completely nude, naked',
-            '张开腿': 'spread legs', '口交': '(fellatio:1.3)', '后入': '(doggystyle:1.3)', '骑乘': '(cowgirl:1.3)',
-            '自慰': '(masturbation:1.3)', '内射': '(creampie:1.3)', '阴唇': 'labia', '阴蒂': 'clitoris',
-            '乳头': 'nipples', '精液': 'semen', '湿润': 'wet pussy', '爱液': 'pussy juice',
-        };
-
-        for (const [kw, tag] of Object.entries(sfwMap)) {
+        for (const [kw, tag] of Object.entries(bodyMap)) {
             if (sceneText.includes(kw)) tags.push(tag);
-        }
-
-        const hasSexInChat = /操|干|插|进入|抽送|高潮|射|口交|后入|骑乘|阴道|阴茎|阴唇|阴蒂|淫水|精液|中出|内射|做爱|性交|自慰|手淫|裸体|张开腿|阴蒂|阴唇/.test(sceneText);
-        if (hasSexInChat) {
-            for (const [kw, tag] of Object.entries(nsfwMap)) {
-                if (sceneText.includes(kw)) tags.push(tag);
-            }
-            tags.push('nsfw');
         }
 
         return {
@@ -714,19 +693,13 @@ ${sceneText}
     }
 
     injectUserAppearance(prompt) {
+        // User appearance injection is only for POV scenes — no NSFW content.
         const isPOV = /solo focus|POV|first person/i.test(prompt);
         if (!isPOV) return prompt;
-
-        const hasSexTags = /pussy|labia|clitoris|penis|fellatio|blowjob|cunnilingus|missionary|doggystyle|cowgirl|creampie|nsfw/i.test(prompt);
-        if (!hasSexTags) return prompt;
 
         const s = this.getSettings();
         let ua = s.userAppearance || '';
         if (!ua || ua.length < 3) return prompt;
-
-        ua = ua.replace(/阴茎[^，,。]*[,，]?\s*/g, '').replace(/包皮[^，,。]*[,，]?\s*/g, '')
-               .replace(/割过[^，,。]*[,，]?\s*/g, '').replace(/阴囊[^，,。]*[,，]?\s*/g, '')
-               .replace(/睾丸[^，,。]*[,，]?\s*/g, '').replace(/勃起[^，,。]*[,，]?\s*/g, '').trim();
 
         const lines = prompt.split('\n');
         if (lines[2]) {
@@ -743,8 +716,6 @@ ${sceneText}
     cleanConflicts(prompt) {
         const changes = [];
         const addChange = (msg) => changes.push(msg);
-
-        const hasExplicit = /pussy|labia|clitoris|penis|penetration|fellatio|blowjob|cunnilingus|missionary|doggystyle|cowgirl|creampie/i.test(prompt);
 
         let lines = prompt.split('\n');
         if (lines.length < 3) return { prompt, changes };
@@ -791,101 +762,53 @@ ${sceneText}
             addChange(`标签上限: ${beforeCap} → ${totalTags} (限制 120)`);
         }
 
-        // Track index shift from potential subject line insertion
-        let indexShift = 0;
-
-        // 1-5: NSFW-specific conflict resolution
-        if (hasExplicit) {
-            // 1. Contradictory action detection
-            const actionLine = lines[2] || '';
-            if (/fellatio|blowjob|oral/i.test(actionLine) && /pussy|labia|clitoris|spread pussy|legs spread|spread legs/i.test(actionLine)) {
-                lines[2] = actionLine.replace(/\(legs spread[^)]*\)/gi, '').replace(/\(spread legs[^)]*\)/gi, '')
-                    .replace(/\(pussy[^)]*\)/gi, '').replace(/\(labia[^)]*\)/gi, '').replace(/\(clitoris[^)]*\)/gi, '')
-                    .replace(/\(spread pussy[^)]*\)/gi, '').replace(/\(wet pussy[^)]*\)/gi, '').replace(/\(pussy juice[^)]*\)/gi, '');
-                addChange('冲突解决: 口交 + 张开腿 → 移除性器官标签');
-            }
-            if (/on back/i.test(actionLine) && /kneeling/i.test(actionLine)) {
-                lines[2] = actionLine.replace(/\(on back[^)]*\)/gi, '').replace(/\bon back\b/gi, '');
-                addChange('冲突解决: 仰卧 + 跪姿 → 移除仰卧');
-            }
-
-            // 2. close-up / cowboy shot conflicts
-            if (/close-up/i.test(prompt) && /(?:legs|spread|kneeling|lying|cowgirl|missionary|doggystyle|full body)/i.test(prompt)) {
-                for (let i = 0; i < lines.length; i++) { lines[i] = lines[i].replace(/\(close-up[^)]*\)/gi, '').replace(/\bclose-up\b/gi, ''); }
-                addChange('冲突解决: close-up + 全身动作 → 移除 close-up');
-            }
-            if (/(?:from above|from below|POV|spread|lying)/i.test(prompt)) {
-                for (let i = 0; i < lines.length; i++) { lines[i] = lines[i].replace(/\(cowboy shot[^)]*\)/gi, '').replace(/\bcowboy shot\b/gi, ''); }
-            }
-
-            // 3. Auto-fill subject line
-            const wholePrompt = lines.join('\n');
-            if (!/(?:\dgirl|\dboy|1girl|1boy|solo focus|1other|multiple|group)/i.test(wholePrompt)) {
-                const povMode = /solo focus|POV|first person/i.test(prompt);
-                lines.splice(1, 0, povMode ? 'solo focus, (looking at viewer:1.5), (POV:1.4), POV, first person view' : '(1girl:1.4), female');
-                indexShift = 1;
-                addChange(povMode ? '自动补全: POV 主体行' : '自动补全: 1girl 主体行');
-            }
-
-            // 3b. Multi-character detection: count named characters in prompt
-            const subjLine = lines[1] || '';
-            const namePattern = /([一-鿿]{1,5}|[A-Z][a-zA-Z]{1,15})\s*:/g;
-            const namedChars = new Set();
-            let m;
-            while ((m = namePattern.exec(wholePrompt)) !== null) {
-                namedChars.add(m[1]); // Collect unique character names
-            }
-            const detectedCount = namedChars.size;
-
-            // Belt-and-suspenders: also check engine's stored char count from collectContext
-            const storedCount = this._charCount || 0;
-            const effectiveCount = Math.max(detectedCount, storedCount);
-
-            if (effectiveCount >= 2) {
-                // Detect gender: look for male markers in body/action lines
-                const hasMale = /penis|\b1boy\b|\bboy\b|male/i.test(wholePrompt);
-                const hasFemale = /pussy|breasts|\b1girl\b|\bgirl\b|female/i.test(wholePrompt);
-                const isMixed = hasMale && hasFemale;
-
-                let expectedSubject;
-                if (isMixed) {
-                    const girlCount = effectiveCount - 1;
-                    expectedSubject = 'couple, 1boy' + (girlCount === 1 ? '1girl' : girlCount + 'girls');
-                } else if (hasMale) {
-                    expectedSubject = effectiveCount + 'boys';
-                } else {
-                    expectedSubject = effectiveCount + 'girls';
-                }
-
-                // Remove all existing count tags, then insert correct one
-                lines[1] = subjLine.replace(/\b\d+(?:girls?|boys?)\b\s*,?\s*/gi, '');
-                lines[1] = expectedSubject + ', ' + lines[1];
-
-                // Multi-character POV: keep POV, remove solo focus
-                if (/solo focus/i.test(lines[1])) {
-                    lines[1] = lines[1].replace(/solo focus\s*,?\s*/gi, '');
-                    addChange('多人检测: 移除 solo focus（多人POV场景）');
-                }
-                addChange(`多人检测: ${effectiveCount}个角色 → ${expectedSubject}${isMixed ? ' (混合性别)' : ''}`);
-                this.log(`多人检测: named=${namedChars.size} stored=${storedCount} → ${expectedSubject}`, 'info');
-            }
-
-            // 4. Body line cleanup (index may have shifted from subject line insertion)
-            const bodyIdx = 4 + indexShift;
-            const sexBodyTags = /\b(?:dark nipples|pink nipples|erect nipples|nipples|areola|labia|clitoris|pussy|penis|glans|pubic hair|wet pussy|pussy juice|grool|semen|cum|wet)(?::\d+\.\d+)?\b/gi;
-            const conflicts = /\b(?:mother|motherly|maternal|warm smile|gentle eyes|gentle expression|soft eyes|soft expression|soft features|wholesome|innocent|pure|modest|proper|pregnant|pregnancy|pregnant scar|pregnant belly|pregnancy stretch marks|from behind|cowboy shot)(?::\d+\.\d+)?\b/gi;
-            if (lines[bodyIdx]) {
-                lines[bodyIdx] = lines[bodyIdx].replace(sexBodyTags, '').replace(conflicts, '');
-                let bodyTags = lines[bodyIdx].split(',').map(t => t.trim()).filter(Boolean);
-                bodyTags = [...new Set(bodyTags)].slice(0, 18);
-                lines[bodyIdx] = bodyTags.join(', ');
-            }
-
-            // 5. Action line cleanup
-            if (lines[2]) lines[2] = lines[2].replace(conflicts, '');
+        // Auto-fill subject line if missing
+        const wholePrompt = lines.join('\n');
+        if (!/(?:\dgirl|\dboy|1girl|1boy|solo focus|1other|multiple|group)/i.test(wholePrompt)) {
+            const povMode = /solo focus|POV|first person/i.test(prompt);
+            lines.splice(1, 0, povMode ? 'solo focus, (looking at viewer:1.5), (POV:1.4), POV, first person view' : '(1girl:1.4), female');
+            addChange(povMode ? '自动补全: POV 主体行' : '自动补全: 1girl 主体行');
         }
 
-        // 5c. Remove duplicate/conflicting count tags in subject line
+        // Multi-character detection: count named characters in prompt
+        const subjLine = lines[1] || '';
+        const namePattern = /([一-鿿]{1,5}|[A-Z][a-zA-Z]{1,15})\s*:/g;
+        const namedChars = new Set();
+        let m;
+        while ((m = namePattern.exec(wholePrompt)) !== null) {
+            namedChars.add(m[1]);
+        }
+        const detectedCount = namedChars.size;
+        const storedCount = this._charCount || 0;
+        const effectiveCount = Math.max(detectedCount, storedCount);
+
+        if (effectiveCount >= 2) {
+            const hasMale = /\b1boy\b|\bboy\b|male/i.test(wholePrompt);
+            const hasFemale = /\b1girl\b|\bgirl\b|female/i.test(wholePrompt);
+            const isMixed = hasMale && hasFemale;
+
+            let expectedSubject;
+            if (isMixed) {
+                const girlCount = effectiveCount - 1;
+                expectedSubject = 'couple, 1boy' + (girlCount === 1 ? '1girl' : girlCount + 'girls');
+            } else if (hasMale) {
+                expectedSubject = effectiveCount + 'boys';
+            } else {
+                expectedSubject = effectiveCount + 'girls';
+            }
+
+            lines[1] = subjLine.replace(/\b\d+(?:girls?|boys?)\b\s*,?\s*/gi, '');
+            lines[1] = expectedSubject + ', ' + lines[1];
+
+            if (/solo focus/i.test(lines[1])) {
+                lines[1] = lines[1].replace(/solo focus\s*,?\s*/gi, '');
+                addChange('多人检测: 移除 solo focus（多人POV场景）');
+            }
+            addChange(`多人检测: ${effectiveCount}个角色 → ${expectedSubject}${isMixed ? ' (混合性别)' : ''}`);
+            this.log(`多人检测: named=${namedChars.size} stored=${storedCount} → ${expectedSubject}`, 'info');
+        }
+
+        // Remove duplicate/conflicting count tags in subject line
         const subjLineClean = lines[1] || '';
         const countTags = subjLineClean.match(/\b\d+(?:girls?|boys?)\b/gi);
         if (countTags && countTags.length > 1) {
@@ -925,7 +848,7 @@ ${sceneText}
         }
 
         // 7. Scene keywords to action line
-        const sceneIdx = 5 + indexShift;
+        const sceneIdx = 5;
         if (lines[sceneIdx]) {
             const sceneKeywords = lines[sceneIdx].match(/\b(?:desk|bed|chair|mirror|window|candle|lamp|sunlight|moonlight|night|table|wall|floor|shower|bathtub|sofa|couch|pillow|sheets)\b/gi);
             if (sceneKeywords && sceneKeywords.length > 0) {
@@ -981,36 +904,18 @@ ${sceneText}
     // ═══════════════════════════════════════════════
 
     enforceContentLevel(prompt, chatContext) {
-        const s = this.getSettings();
-        const level = s.intensity || '自动';
-
-        if (level === '显式') return prompt;
-
-        let effectiveLevel = level;
-        if (level === '自动') {
-            const hasSexInChat = /操|干|插|进入|抽送|高潮|射|舔阴|口交|乳交|后入|骑乘|传教士|阴道|阴茎|阴唇|阴蒂|淫水|精液|中出|内射|做爱|性交|交合|插入|进入她|进入你|插进去|干你|干我|操你|操我|肏|骚|浪|叫床|呻吟|扭腰|挺腰|抽插|顶|蹭下面|摸下面|摸那里|抠|塞进去|整根|龟头|包皮|勃起|硬了|湿了|流水|泄了/i.test(chatContext || '');
-            if (hasSexInChat) return prompt;
-            effectiveLevel = '无';
-        }
-
         const lines = prompt.split('\n');
         const sexActs = /\b(?:fellatio|blowjob|cunnilingus|missionary|doggystyle|cowgirl|reverse cowgirl|standing doggystyle|prone bone|spoon position|facesitting|69 position|paizuri|titfuck|creampie|facial|cum on|penetration|penis in|penis entering|POV penis|own penis|erect penis)(?::\d+\.\d+)?\b/gi;
         const sexOrgans = /\b(?:pussy|labia|clitoris|penis|glans|nipples|areola)(?::\d+\.\d+)?\b/gi;
         const sexFluids = /\b(?:pussy juice|grool|semen|cum|precum)(?::\d+\.\d+)?\b/gi;
         const sexModifiers = /\b(?:spread pussy|wet pussy|tight pussy|pussy visible|cameltoe|crotch exposed|crotch|pubic area|pubic bone|groin|pelvis|no panties|braless|visible nipples|erect nipples|hard nipples|see.through|translucent clothing|sheer|upskirt|panty shot|panties visible)(?::\d+\.\d+)?\b/gi;
 
-        if (effectiveLevel === '无') {
-            for (let i = 0; i < lines.length; i++) {
-                lines[i] = lines[i].replace(sexActs, '').replace(sexOrgans, '').replace(sexFluids, '').replace(sexModifiers, '');
-            }
-            if (lines[2]) lines[2] = '(fully clothed:1.4), (non-nude:1.4), (sfw:1.3), (clothes on:1.3), (modest:1.2), ' + lines[2];
-            this.log('内容门控: 无/自动降级 → 强制SFW着装', 'info');
-        } else {
-            for (let i = 0; i < lines.length; i++) {
-                lines[i] = lines[i].replace(sexActs, '');
-            }
-            this.log('内容门控: 软色情 → 去性行为，留裸露', 'info');
+        // Always enforce SFW — strip all NSFW tags
+        for (let i = 0; i < lines.length; i++) {
+            lines[i] = lines[i].replace(sexActs, '').replace(sexOrgans, '').replace(sexFluids, '').replace(sexModifiers, '');
         }
+        if (lines[2]) lines[2] = '(fully clothed:1.4), (non-nude:1.4), (sfw:1.3), (clothes on:1.3), (modest:1.2), ' + lines[2];
+        this.log('内容门控: SFW — 强制SFW着装', 'info');
 
         let result = lines.join('\n');
         result = result.replace(/,\s*,/g, ',').replace(/^\s*,\s*/, '').replace(/,\s*$/, '');
@@ -1022,17 +927,6 @@ ${sceneText}
     // ═══════════════════════════════════════════════
 
     buildNegative(llmNegative, chatContext = '') {
-        const s = this.getSettings();
-        const level = s.intensity || '自动';
-
-        // Mirror enforceContentLevel's auto-detection to stay in sync
-        let effectiveLevel = level;
-        if (level === '自动') {
-            const hasSex = /操|干|插|进入|抽送|高潮|射|舔阴|口交|乳交|后入|骑乘|阴道|阴茎|阴唇|阴蒂|淫水|精液|中出|内射|做爱|性交|交合|插入|进入她|进入你|插进去|干你|干我|操你|操我|肏|骚|浪|叫床|呻吟|扭腰|挺腰|抽插|顶|蹭下面|摸下面|摸那里|抠|塞进去|整根|龟头|包皮|勃起/i.test(chatContext || '');
-            effectiveLevel = hasSex ? '显式' : '无';
-        }
-        const needsAntiCensor = (effectiveLevel === '显式' || effectiveLevel === '软色情');
-
         let base = '';
         if (llmNegative && llmNegative.length > 10) {
             base = llmNegative;
@@ -1040,19 +934,11 @@ ${sceneText}
             base = 'lowres, (bad quality:1.2), (worst quality:1.2), bad anatomy, ugly, blurry, watermark, extra digits, signature, text';
         }
 
-        // Only prepend anti-censor for explicit/soft content
-        if (needsAntiCensor) {
-            // Clean any stray anti-nudity tags from LLM's negative output
-            base = base.replace(/\bnsfw\b,?\s*/gi, '')
-                       .replace(/\bnude\b,?\s*/gi, '')
-                       .replace(/\bnaked\b,?\s*/gi, '')
-                       .replace(/\b(fully\s*)?clothed\b,?\s*/gi, '')
-                       .replace(/\bnon-nude\b,?\s*/gi, '')
-                       .replace(/\bmodest\b,?\s*/gi, '')
-                       .replace(/\bsfw\b,?\s*/gi, '');
-            return ANTI_CENSOR_TAGS + ', ' + base;
-        }
-        // SFW scene: add anti-nudity protection (critical for uncensored models like WAI)
+        // Always add anti-nudity protection for SFW content
+        // Clean any stray NSFW-positive tags from LLM negative output, then prepend SFW guards
+        base = base.replace(/\bnsfw\b,?\s*/gi, '')
+                   .replace(/\bnude\b,?\s*/gi, '')
+                   .replace(/\bnaked\b,?\s*/gi, '');
         return 'nsfw, nude, naked, nipples, ' + base;
     }
 
@@ -1088,7 +974,7 @@ ${sceneText}
 ${desc.substring(0, 1500)}
 
 要求:
-- 只提取永久特征: 发色/发型/瞳色/肤色/脸型/体型/胸部大小/身高等
+- 只提取永久特征: 发色/发型/瞳色/肤色/脸型/体型/身高等
 - 不要提取: 服装/饰品/妆容/表情（这些会随场景变化）
 - 使用精确标签: black hair, long hair, brown eyes, pale skin, medium breasts, slim waist, oval face, sharp nose 等
 - 关键特征加 (feature:1.2) 权重
@@ -1159,4 +1045,4 @@ ${desc.substring(0, 1500)}
 // Exports
 // ═══════════════════════════════════════════════════════════
 
-export { S2PEngine, DEFAULT_SYSTEM_PROMPT, ANTI_CENSOR_TAGS };
+export { S2PEngine, DEFAULT_SYSTEM_PROMPT };

@@ -169,7 +169,7 @@ function buildDanbooruPrompt(profile) {
     let extraRules = '';
 
     if (profile.specialTagSystem === 'score') {
-        extraRules = '\n## Pony 标签体系\n必须使用 score_9, score_8_up... 评分链作为品质标签。支持 source_anime/source_furry/source_pony 选择风格和 rating_safe/rating_explicit 控制分级。';
+        extraRules = '\n## Pony 标签体系\n必须使用 score_9, score_8_up... 评分链作为品质标签。使用 source_anime/source_furry/source_pony 选择风格，使用 rating_safe 确认为全年龄内容。';
     }
 
     if (profile.specialTagSystem === 'noobai') {
@@ -221,7 +221,7 @@ function buildDanbooruPrompt(profile) {
 第4行 — 服装(<=10): 多人按角色分写: name1: clothing1; name2: clothing2。同场景同制服写一次即可
 
 第5行 — 身体+发型(<=30): 多人按角色分写: name1: hair/eyes/build; name2: hair/eyes/build。禁止混淆特征
-  （性器官/体液标签规则见底部「内容级别」说明）
+第5行 — 身体+发型(<=30): 多人按角色分写: name1: hair/eyes/build; name2: hair/eyes/build。禁止混淆特征
 
 第6行 — ${profile.specialTagSystem === 'noobai' ? '场景+光线+构图(<=4) + ★品质标签★(<=4,末尾): ' + profile.qualityPrefix + '。然后根据人数选镜头:' : '场景+光线+视角+构图(<=8): 根据人数和场景选镜头:'}
   单人: 自由构图
@@ -253,7 +253,7 @@ ${notes}${extraRules}
 - ★★★ 人数铁律: 如果用户消息中标注了「当前场景共有 N 个角色」，第2行必须用对应的人数标签。N≥2 时禁止使用 1girl/solo focus（即使用POV也不能用solo focus）；必须使用 Ngirls 或 1boy(N-1)girls 等正确标签
 - 多人场景: 以聊天记录中明确在场的角色为准，不编造不在场角色
 - ★ 多人防混合: 负向词中必须含 duplicate, bilateral symmetry, (blending:1.3) 防止角色特征互相污染
-- 性内容标签的位置由底部「内容级别」说明决定，严格遵守
+- 严格遵守内容级别（SFW），禁止任何性相关标签
 
 ## 反向提示词
 ${profile.negativePrefix}
@@ -327,51 +327,13 @@ ${profile.negativePrefix}
 // ═══════════════════════════════════════════════════════════
 
 function buildContentBlock(intensity) {
-    switch (intensity) {
-        case '无':
-            return `## 内容级别: SFW
+    // All content is strictly SFW
+    return `## 内容级别: SFW
 当前为全年龄场景。所有6行均禁止任何性相关标签。
 - 第3行: 禁止性行为标签
 - 第5行: 禁止性器官/体液标签，身体描述限于脸/发型/体型
 - 第6行: 禁止性暗示场景描述
 人物必须保持着装完整。`;
-
-        case '软色情':
-            return `## 内容级别: 软色情
-允许裸露和性感氛围，但无明确性行为。
-- 第3行: 允许 suggestive pose, 但禁止性行为标签 (禁止: missionary/doggystyle/cowgirl/fellatio/blowjob/cunnilingus/creampie 等)
-- 第4行: 允许 lingerie, underwear, partially clothed, completely nude 等
-- 第5行: 允许体型描述(large breasts, curvy, slim waist 等)，允许裸露状态(nude, bare)，禁止性器官标签(pussy/labia/penis/glans/nipples 等)
-- 第6行: 允许 dim lighting, bedroom, on bed`;
-
-        case '显式':
-            return `## ★★★ 内容级别: 显式 — 必须包含性器官标签 ★★★
-
-⚠️ 这是硬性要求，不是建议。性器官标签是画面核心，缺少会导致生成结果完全不正确。
-
-第3行(姿势+表情) — 必须包含性行为标签:
-  权重1.3。从聊天记录中提取当前发生的性行为，选择对应标签（必须至少一个）:
-    missionary(传教士) / doggystyle(后入) / cowgirl(骑乘) / fellatio+blowjob(口交) / cunnilingus(舔阴) / spoon(侧入) / masturbation+fingering(自慰) / creampie(中出)
-  配合表情: ahegao, orgasm, embarrassed, tears, closed eyes, open mouth, tongue out
-
-第5行(身体) — ★★★ 必须包含性器官标签 ★★★:
-  根据画面中可见的身体部位，必须至少包含以下标签之一（权重1.3）:
-    女性器官: pussy, labia, clitoris, (spread pussy:1.3), (wet pussy:1.2)
-    男性器官: penis, glans, (erect penis:1.3)
-    共通器官: nipples, (erect nipples:1.2)
-  体液标签（权重1.2）: pussy juice, semen, cum, saliva, sweat, grool — 根据场景添加
-  状态标签: erect, wet, parted, spread, penetration, inside
-  多人时必须按角色分别列出各自可见的性器官: name1: pussy/labia; name2: penis/glans
-
-第6行(场景):
-  必须包含 POV / first person view / close-up / from above / on bed / mirror 中的适当标签。POV由你判断。`;
-
-        default: // 自动
-            return `## 内容级别: 自动判断
-根据聊天内容自行判断当前是否为 NSFW 场景：
-- 如果是 SFW 日常场景(吃饭/写作业/运动/逛街等)：所有行的性标签禁止，即使角色设定中有性器官描写也不使用。
-- 如果涉及性内容：按显式规则处理（第3行可含性行为，第5行可含性器官/体液）。`;
-    }
 }
 
 // ═══════════════════════════════════════════════════════════

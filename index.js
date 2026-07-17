@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS = {
 
     // Image generation
     style: 'WAI',
-    intensity: '自动',          // 自动 / 显式 / 软色情 / 无
+    intensity: '无',          // SFW only
     contextMessages: 12,       // 2-30
     pov: false,                // POV 手动强制
     preprocess: true,          // 过滤对话/心理描写
