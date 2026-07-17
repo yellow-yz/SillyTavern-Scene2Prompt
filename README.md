@@ -15,7 +15,6 @@
 - **9+ 模型配置**：WAI / NoobAI / Animagine / Hassaku / Pony / Nutella Pie / Kohaku / Illustrious / SDXL Base — 每个基于实测参数
 - **自动检测 ComfyUI 模型**：对接 ST 接口，识别你安装的模型，自动匹配配置
 - **一键同步 ST**：选模型 → 自动写 ST 的工作流/模型/CFG/Steps/采样器/分辨率
-- **3 级内容门控**：自动/显式/软色情/无
 - **多人场景**：角色分离+空间关系+防特征混合
 - **情绪感知**：从对话检测 35 种情绪 → 自动映射 Danbooru 表情标签
 - **性格识别**：从角色卡提取 20 种性格 → 生成姿势/表情倾向
@@ -83,7 +82,6 @@ SillyTavern/data/default-user/extensions/scene2prompt/
 | 点「画面」无反应 | ComfyUI 已启动？ST SD 设置已配？ |
 | 画面异常 | 工作流选对了吗？v-pred 模型用 `S2P_SDXL_vpred.json` |
 | 多人特征混合 | 换 Animagine XL 或 Hassaku XL |
-| SFW 出裸体 | 内容门控改"无"，模型用 Animagine |
 | 404 Not Found (settings.html) | 目录名必须为 `scene2prompt`，不能是 `SillyTavern-Scene2Prompt` |
 
 ## 许可
